@@ -4716,8 +4716,12 @@ class ambient_generic extends BaseEntity {
         }
     }
     
-    private input_stopsound(): void {
+    public input_stopsound(): void {
         this.isPlaying = false;
+        if (this.source) {
+            this.source.stop();
+            this.paused = true;
+        }
     }
 
     private input_togglesound(): void {
@@ -5336,8 +5340,14 @@ export class EntitySystem {
     }
 
     public destroy(device: GfxDevice): void {
-        for (let i = 0; i < this.entities.length; i++)
-            this.entities[i].destroy(device);
+        for (let i = 0; i < this.entities.length; i++) {
+            const entity = this.entities[i];
+            // Stop any playing sounds before destroying
+            if (entity instanceof ambient_generic) {
+                entity.input_stopsound();
+            }
+            entity.destroy(device);
+        }
     }
 }
 
