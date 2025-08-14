@@ -4716,11 +4716,18 @@ class ambient_generic extends BaseEntity {
         }
     }
     
-    public input_stopsound(): void {
+    private input_stopsound(): void {
         this.isPlaying = false;
         if (this.source) {
             this.source.stop();
             this.paused = true;
+        }
+    }
+
+    public override destroy(device: GfxDevice): void {
+        super.destroy(device);
+        if (this.source) {
+            this.source.stop();
         }
     }
 
@@ -5342,10 +5349,6 @@ export class EntitySystem {
     public destroy(device: GfxDevice): void {
         for (let i = 0; i < this.entities.length; i++) {
             const entity = this.entities[i];
-            // Stop any playing sounds before destroying
-            if (entity instanceof ambient_generic) {
-                entity.input_stopsound();
-            }
             entity.destroy(device);
         }
     }
