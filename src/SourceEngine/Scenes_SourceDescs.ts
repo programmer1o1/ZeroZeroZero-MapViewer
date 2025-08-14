@@ -19,8 +19,12 @@ export class TeamFortress2SceneDesc implements SceneDesc {
             await Promise.all([
                 filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_textures`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_sound_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_sound_vo_english`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
             ]);
             return filesystem;
         });
@@ -41,8 +45,12 @@ export class CGESceneDesc implements SceneDesc {
             const vpkMounts = [
                 filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_textures`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_sound_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_sound_vo_english`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
             ];
             
             await Promise.all(vpkMounts);
@@ -71,6 +79,8 @@ export class HalfLife2Ep2SceneDesc implements SceneDesc {
                 // filesystem.createVPKMount(`${pakfilesPathBase}/episodic/ep1_pak`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
             ]);
             return filesystem;
         });
@@ -90,6 +100,8 @@ export class HalfLife2SceneDesc implements SceneDesc {
             await Promise.all([
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
             ]);
             return filesystem;
         });
@@ -111,6 +123,10 @@ export class CounterStrikeSourceSceneDesc implements SceneDesc {
                 filesystem.createVPKMount(`${pakfilesPathBase}/cstrike/cstrike_pak`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
+
+                
             ]);
             return filesystem;
         });
@@ -153,6 +169,8 @@ export class DayOfDefeatSceneDesc implements SceneDesc {
             await Promise.all([
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
+                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
                 filesystem.createVPKMount(`${pakfilesPathBase}/dod/dod_pak`),
             ]);
             return filesystem;

@@ -2610,7 +2610,7 @@ class logic_timer extends BaseEntity {
         super(entitySystem, renderContext, bspRenderer, entity);
 
         this.output_onTimer.parse(this.entity.ontimer);
-        this.refiretime = Number(fallbackUndefined(this.entity.refiretime, '5'));
+        this.refiretime = Number(fallbackUndefined(this.entity.refiretime, '0.03'));
         this.useRandomTime = fallbackUndefined(this.entity.userandomtime, '0') !== '0';
         this.lowerRandomBound = Number(fallbackUndefined(this.entity.lowerrandombound, '0'));
         this.upperRandomBound = Number(fallbackUndefined(this.entity.upperrandombound, '5'));
@@ -4649,7 +4649,16 @@ class ambient_generic extends BaseEntity {
     private audtime: number = 0;
     private audrate: number = 1;
     private source: AudioBufferSourceNode;
+    private gain: GainNode;
     private paused: boolean = true;
+
+    private volume: number = 10;
+    private maxDistance: number = 10000;
+    private pitch: number = 100;
+    private sourceEntityName: string | null = null;
+
+    private loop: boolean = false
+    private playEverywhere: boolean = false
 
     constructor(entitySystem: EntitySystem, renderContext: SourceRenderContext, bspRenderer: BSPRenderer, entity: BSPEntity) {
         super(entitySystem, renderContext, bspRenderer, entity);
@@ -4663,7 +4672,25 @@ class ambient_generic extends BaseEntity {
         this.registerInput('fadeout', this.input_fadeout.bind(this));
         
         this.message = entity.message
+        this.volume = parseInt(entity.health)
+        this.maxDistance = parseFloat(entity.radius)
+        this.pitch = parseInt(entity.pitch)
+
+        this.sourceEntityName = fallbackUndefined(entity.sourceentityname, null)
+
         this.fetchAudio(renderContext, entity.message);
+
+        const enum SpawnFlags {
+            PLAY_EVERYWHERE = 0x01,
+            START_SILENT  = 0x10,
+            IS_NOT_LOOPED = 0x20,
+            DO_NOT_PAUSE  = 0x40,
+        };
+
+        const spawnflags: SpawnFlags = Number(fallbackUndefined(this.entity.spawnflags, '0'));
+        this.loop = spawnflags&SpawnFlags.IS_NOT_LOOPED ? false : true;
+        this.playEverywhere = spawnflags&SpawnFlags.PLAY_EVERYWHERE ? true : false;
+        this.isPlaying = spawnflags&SpawnFlags.START_SILENT ? false : true;
 
     }
 
@@ -4675,6 +4702,7 @@ class ambient_generic extends BaseEntity {
         }
 
         this.audioContext = new AudioContext()
+        this.gain = new GainNode(this.audioContext);
         this.audioBuffer = await this.audioContext.decodeAudioData(audioData.copyToBuffer(), ()=>console.log(`loaded ${message}`));
         
     }
@@ -4685,11 +4713,42 @@ class ambient_generic extends BaseEntity {
     }
     
     private input_playsound(): void {
-        if (!this.isPlaying){
-            this.isPlaying = true;
-            console.log(`play ${this.message}`);
-
+        this.audtime = 0
+        this.isPlaying = true;
+        if (!this.paused) this.startsound()
+        console.log(`play ${this.message}`);
+    }
+    
+    private startsound(): void {
+        this.stopsound()
+        this.source = this.audioContext.createBufferSource();
+        this.source.playbackRate.value = this.pitch / 100;
+        this.source.buffer = this.audioBuffer;
+        this.source.connect(this.gain).connect(this.audioContext.destination);
+        this.source.start(0, this.audtime)
+    }
+    private stopsound(): void {
+        if (this.source) {
+            this.source.stop()
         }
+    }
+    private getDistanceToPlayer(entitySystem: EntitySystem): number {
+        const player = entitySystem.getLocalPlayer()
+        const playerPos = vec3.create()
+        const thisPos = vec3.create()
+        player.getAbsOrigin(playerPos)
+
+        if (this.sourceEntityName){
+            const sourceEntity = entitySystem.findEntityByTargetName(this.sourceEntityName);
+            if (sourceEntity) {
+                sourceEntity.getAbsOrigin(thisPos)
+            } else {
+                this.getAbsOrigin(thisPos)
+            }
+        } else {
+            this.getAbsOrigin(thisPos)
+        }
+        return vec3.distance(playerPos, thisPos);
     }
 
     public override movement(entitySystem: EntitySystem, renderContext: SourceRenderContext): void {
@@ -4697,6 +4756,14 @@ class ambient_generic extends BaseEntity {
         if (this.audioBuffer !== null) {
             if (this.isPlaying) {
                 this.audtime += renderContext.globalDeltaTime * this.audrate;
+                
+                if (this.playEverywhere){
+                    this.gain.gain.value = this.volume / 10;
+                } else {
+                    const dist = this.getDistanceToPlayer(entitySystem)
+                    const distVol = clamp((this.maxDistance - dist) / this.maxDistance,0,1)
+                    this.gain.gain.value = distVol * this.volume / 10;
+                }
 
                 if (this.audtime < 0) this.audtime = 0;
                 
@@ -4705,11 +4772,12 @@ class ambient_generic extends BaseEntity {
                     this.paused = true;
                 }
                 if (renderContext.globalDeltaTime > 0 && this.paused){
-                    this.source = this.audioContext.createBufferSource();
-                    this.source.buffer = this.audioBuffer;
-                    this.source.connect(this.audioContext.destination);
-                    this.source.start(0, this.audtime)
+                    this.startsound()
                     this.paused = false;
+                }
+                if (this.loop && this.audtime >= this.audioBuffer.duration){
+                    this.audtime -= this.audioBuffer.duration
+                    this.startsound()
                 }
                 
             }
@@ -4726,9 +4794,7 @@ class ambient_generic extends BaseEntity {
 
     public override destroy(device: GfxDevice): void {
         super.destroy(device);
-        if (this.source) {
-            this.source.stop();
-        }
+        this.stopsound()
     }
 
     private input_togglesound(): void {
