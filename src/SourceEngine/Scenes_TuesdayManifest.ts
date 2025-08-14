@@ -11,27 +11,27 @@ const id = 'TuesdayManifest';
 const name = 'Tuesday Manifest';
 const sceneDescs = [
     "Team Fortress 2",
-    new TeamFortress2SceneDesc('tf_data'),
-    new TeamFortress2SceneDesc('tf_data2'),
-    new TeamFortress2SceneDesc('tf_data3'),
-    new TeamFortress2SceneDesc('tf_data4'),
-    new TeamFortress2SceneDesc('tf_data5'),
-    new TeamFortress2SceneDesc('tf_data6'),
-    new TeamFortress2SceneDesc('tf_data7'),
+    new TeamFortress2SceneDesc('tf_data', 'data - Landscape'),
+    new TeamFortress2SceneDesc('tf_data2', 'data2 - ELX'),
+    new TeamFortress2SceneDesc('tf_data3', 'data3 - Shattered Buildings'),
+    new TeamFortress2SceneDesc('tf_data4', 'data4 - Box'),
+    new TeamFortress2SceneDesc('tf_data5', 'data5 - Heavy Torus'),
+    new TeamFortress2SceneDesc('tf_data6', 'data6 - City'),
+    new TeamFortress2SceneDesc('tf_data7', 'data7 - Gravel Grave'),
     "Half-Life 2",
-    new HalfLife2SceneDesc('hl2_data'),
+    new HalfLife2SceneDesc('hl2_data', 'data - Area Portal'),
     
     "Half-Life 2: Episode 2",
-    new HalfLife2Ep2SceneDesc('ep2_data'),
-    new HalfLife2Ep2SceneDesc('ep2_data2'),
+    new HalfLife2Ep2SceneDesc('ep2_data', 'data - Hi Guy'),
+    new HalfLife2Ep2SceneDesc('ep2_data2', 'data2 - Fear Inc.'),
     
     "Counter Strike: Global Offensive",
-    new CounterStrikeGOSceneDesc('csgo_data'),
-    new CounterStrikeGOSceneDesc('csgo_data2'),
-    new CounterStrikeGOSceneDesc('csgo_data3'),
+    new CounterStrikeGOSceneDesc('csgo_data', 'data - Training Course'),
+    new CounterStrikeGOSceneDesc('csgo_data2', 'data2 - Bowl'),
+    new CounterStrikeGOSceneDesc('csgo_data3', 'data3 - Office Head'),
     
     "Day of Defeat",
-    new DayOfDefeatSceneDesc('dod_data'),
+    new DayOfDefeatSceneDesc('dod_data', 'data - Maze'),
 
     "Source Filmmaker",
 
