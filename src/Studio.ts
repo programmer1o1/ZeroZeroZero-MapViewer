@@ -8,7 +8,7 @@ import { clamp, calcEulerAngleRotationFromSRTMatrix, getMatrixAxisZ, lerp, invle
 import { mat4, ReadonlyMat4, vec3, vec2 } from 'gl-matrix';
 import { GlobalSaveManager } from './SaveManager.js';
 import { getPointHermite } from './Spline.js';
-import { Muxer, ArrayBufferTarget } from 'webm-muxer';
+
 import { downloadBuffer } from './DownloadUtils.js';
 
 export const CLAPBOARD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" height="20" fill="white"><path d="M61,22H14.51l3.41-.72h0l7.74-1.64,2-.43h0l6.85-1.46h0l1.17-.25,8.61-1.83h0l.78-.17,9-1.91h0l.4-.08L60,12.33a1,1,0,0,0,.77-1.19L59.3,4.3a1,1,0,0,0-1.19-.77l-19,4-1.56.33h0L28.91,9.74,27.79,10h0l-9.11,1.94-.67.14h0L3.34,15.17a1,1,0,0,0-.77,1.19L4,23.11V60a1,1,0,0,0,1,1H61a1,1,0,0,0,1-1V23A1,1,0,0,0,61,22ZM57,5.8l.65.6.89,4.19-1.45.31L52.6,6.75ZM47.27,7.88,51.8,12,47.36,13,42.82,8.83ZM37.48,10,42,14.11l-4.44.94L33,10.91ZM27.7,12l4.53,4.15-4.44.94L23.26,13Zm-9.78,2.08,4.53,4.15L18,19.21l-4.53-4.15ZM19.49,29H14.94l3.57-5h4.54Zm9-5h4.54l-3.57,5H24.94ZM39,45.88l-11,6A1,1,0,0,1,26.5,51V39A1,1,0,0,1,28,38.12l11,6a1,1,0,0,1,0,1.76ZM39.49,29H34.94l3.57-5h4.54Zm10,0H44.94l3.57-5h4.54ZM60,29H54.94l3.57-5H60Z"/></svg>`;
@@ -2345,26 +2345,58 @@ export class StudioPanel extends FloatingPanel {
     }
 
     private async record() {
-        if (this.useDirectRecording && await VideoRecorder.isSupported()) {
+        if (await VideoRecorder.isSupported()) {
             this.recordVideo();
         } else {
+            console.warn('WebCodecs not supported, falling back to manual recording');
             this.playAnimation(true);
         }
     }
 
     private async recordVideo() {
         this.disableControls();
+        
+        // Add progress indicator
+        const progressMsg = document.createElement('div');
+        progressMsg.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 18px;
+            z-index: 9999;
+            text-align: center;
+        `;
+        progressMsg.innerHTML = `
+            <div>Recording Animation...</div>
+            <div style="margin-top: 10px; font-size: 14px;">Frame <span id="frameCounter">0</span> of <span id="totalFrames">0</span></div>
+            <div style="margin-top: 10px; font-size: 12px; color: #aaa;">Please wait, this may take a moment</div>
+        `;
+        document.body.appendChild(progressMsg);
 
         this.animationManager.initAnimationPlayback(this.animation, 0);
         this.studioCameraController.isAnimationPlaying = true;
-
         this.viewer.externalControl = true;
 
-        this.videoRecorder = new VideoRecorder(this.viewer, this.animationManager);
+        this.videoRecorder = new VideoRecorder(this.viewer, this.animationManager, (current, total) => {
+            const frameCounter = document.getElementById('frameCounter');
+            const totalFrames = document.getElementById('totalFrames');
+            if (frameCounter) frameCounter.textContent = current.toString();
+            if (totalFrames) totalFrames.textContent = total.toString();
+        });
+        
         await this.videoRecorder.render();
 
-        if (this.videoRecorder !== null && !this.videoRecorder.aborted)
+        document.body.removeChild(progressMsg);
+
+        if (this.videoRecorder !== null && !this.videoRecorder.aborted) {
+            this.displayMessage('✓ Video downloaded successfully!');
             this.stopAnimation();
+        }
     }
 
     public playAnimation(theater?: boolean) {
@@ -3893,107 +3925,150 @@ export class StudioPanel extends FloatingPanel {
     }
 }
 
+// changed this so that it records real-time, previous method was like slow or smth so yeah
 class VideoRecorder {
-    private encoder: VideoEncoder;
-    private target: ArrayBufferTarget;
-    private muxer: Muxer<ArrayBufferTarget>;
-    private static codec = 'vp09.00.10.08';
+    private recorder: MediaRecorder | null = null;
+    private chunks: Blob[] = [];
+    private stream: MediaStream | null = null;
     private framerate = 60;
-    private bitrate = 4e7;
 
     public aborted = false;
 
-    constructor(private viewer: Viewer.Viewer, private cameraController: CameraAnimationManager) {
-        const width = viewer.canvas.width;
-        const height = viewer.canvas.height;
-
-        this.target = new ArrayBufferTarget();
-
-        this.muxer = new Muxer({ 
-            target: this.target,
-            video: {
-                codec: 'V_VP9', width, height,
-            },
-        });
-
-        this.encoder = new VideoEncoder({
-            output: (chunk, meta) => { this.muxer.addVideoChunk(chunk, meta); },
-            error: (e) => { console.error(e) },
-        });
-
-        this.encoder.configure({
-            codec: VideoRecorder.codec,
-            width, height,
-            bitrate: this.bitrate,
-            framerate: this.framerate,
-        });
-    }
+    constructor(
+        private viewer: Viewer.Viewer, 
+        private cameraController: CameraAnimationManager,
+        private onProgress?: (current: number, total: number, phase?: string) => void
+    ) {}
 
     public async render() {
         const mspf = 1000 / this.framerate;
         const frameCount = Math.ceil(this.cameraController.durationMs / mspf);
 
-        // Ideally we'd do this offscreen...
+        console.time('Total render time');
+
+        this.stream = this.viewer.canvas.captureStream(this.framerate);
+
+        const codecOptions = [
+            { mimeType: 'video/webm;codecs=vp8', bitsPerSecond: 50000000 },
+            { mimeType: 'video/webm;codecs=vp9', bitsPerSecond: 40000000 }, 
+            { mimeType: 'video/webm;codecs=h264', bitsPerSecond: 30000000 }, 
+            { mimeType: 'video/webm', bitsPerSecond: 50000000 }, 
+        ];
+
+        let options = codecOptions.find(opt => MediaRecorder.isTypeSupported(opt.mimeType));
+        
+        if (!options) {
+            console.error('No supported codec found');
+            return;
+        }
+
+        console.log('Using:', options.mimeType, 'at', (options.bitsPerSecond / 1e6) + 'Mbps');
+
+        this.recorder = new MediaRecorder(this.stream, {
+            mimeType: options.mimeType,
+            videoBitsPerSecond: options.bitsPerSecond,
+        });
+
+        this.chunks = [];
+        this.recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                this.chunks.push(e.data);
+            }
+        };
+
+        this.recorder.start(100);
+
         const updateInfo: Viewer.ViewerUpdateInfo = {
             time: this.viewer.rafTime,
             webXRContext: null,
         };
 
-        let timestamp = 0;
-        let keyFrameTime = -1;
-        for (let frame = 0; frame < frameCount; frame++) {
-            if (this.aborted)
-                break;
+        let frameCounter = 0;
+        const startTime = performance.now();
 
-            const timeInMilliseconds = (frame * mspf);
+        for (let frame = 0; frame < frameCount; frame++) {
+            if (this.aborted) break;
+
+            const timeInMilliseconds = frame * mspf;
             this.cameraController.setElapsedTime(timeInMilliseconds);
             this.viewer.update(updateInfo);
             updateInfo.time += mspf;
 
-            const videoFrame = new VideoFrame(this.viewer.canvas, { timestamp });
-            timestamp += mspf * 1000; // microseconds
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            frameCounter++;
 
-            // Force a keyframe every second
-            const keyFrame = keyFrameTime < 0 || (timestamp - keyFrameTime) >= 1000000;
-            if (keyFrame)
-                keyFrameTime = timestamp;
-
-            this.encoder.encode(videoFrame, { keyFrame });
-            videoFrame.close();
-
-            // Wait a bit before the next frame.
-            while (this.encoder.encodeQueueSize > 2 && !this.aborted)
-                await this.waitPromise(16);
+            if (frame % 10 === 0 || frame === frameCount - 1) {
+                if (this.onProgress) {
+                    const elapsed = (performance.now() - startTime) / 1000;
+                    const fps = frameCounter / elapsed;
+                    this.onProgress(frame + 1, frameCount, `Recording @ ${fps.toFixed(0)}fps`);
+                }
+            }
         }
 
         if (this.aborted) {
-            this.encoder.close();
+            this.cleanup();
             return;
         }
 
-        await this.encoder.flush();
-        this.muxer.finalize();
+        if (this.onProgress) {
+            this.onProgress(frameCount, frameCount, 'Finalizing');
+        }
 
+        // stop and wait for final data
+        await new Promise<void>((resolve) => {
+            this.recorder!.onstop = () => resolve();
+            this.recorder!.stop();
+        });
+
+        console.timeEnd('Total render time');
+
+        // create final blob
+        const blob = new Blob(this.chunks, { type: options.mimeType });
+        const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
+        console.log('File size:', sizeMB, 'MB');
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
         const sceneDescName = GlobalSaveManager.getCurrentSceneDescId()?.replace('/', '_');
-        const filename = `Studio_${sceneDescName}.webm`;
-        downloadBuffer(filename, this.target.buffer, 'video/webm');
+        const ext = options.mimeType.includes('webm') ? 'webm' : 'mp4';
+        a.download = `Studio_${sceneDescName}.${ext}`;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+        this.cleanup();
     }
 
-    private waitPromise(ms: number): Promise<void> {
-        return new Promise((resolve, reject) => {
-            setTimeout(() => resolve(), ms);
-        })
+    private cleanup() {
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+        this.chunks = [];
+        this.recorder = null;
     }
 
     public static async isSupported(): Promise<boolean> {
-        if (typeof VideoEncoder === "undefined")
+        if (typeof MediaRecorder === "undefined") {
             return false;
+        }
 
-        // hopefully 1024x1024 is enough for our purposes
-        const ret = await VideoEncoder.isConfigSupported({
-            codec: this.codec,
-            width: 1024, height: 1024,
-        });
-        return !!ret.supported;
+        const codecs = [
+            'video/webm;codecs=vp8',
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=h264',
+            'video/webm',
+        ];
+
+        for (const codec of codecs) {
+            if (MediaRecorder.isTypeSupported(codec)) {
+                console.log('Will use:', codec);
+                return true;
+            }
+        }
+
+        return false;
     }
 }

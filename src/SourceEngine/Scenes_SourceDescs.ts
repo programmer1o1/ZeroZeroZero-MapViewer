@@ -1,4 +1,3 @@
-
 import { GfxDevice } from "../gfx/platform/GfxPlatform.js";
 import { SceneContext, SceneDesc, SceneGroup } from "../SceneBase.js";
 import { SourceFileSystem, SourceLoadContext } from "./Main.js";
@@ -8,6 +7,21 @@ import { createKitchenSinkSourceFilesytem } from "./Scenes_FileDrops.js";
 const pakfilesPathBase = `paks`;
 const tfPathBase = `TeamFortress2`;
 
+// helper to load vpks with priority (critical first, optional later)
+async function loadVPKsWithPriority(
+    filesystem: SourceFileSystem,
+    criticalVPKs: string[],
+    optionalVPKs: string[] = []
+): Promise<void> {
+    // load critical vpks first
+    await Promise.all(criticalVPKs.map(path => filesystem.createVPKMount(path)));
+    
+    // load optional vpks in background (don't wait)
+    if (optionalVPKs.length > 0) {
+        Promise.all(optionalVPKs.map(path => filesystem.createVPKMount(path))).catch(console.error);
+    }
+}
+
 export class TeamFortress2SceneDesc implements SceneDesc {
     constructor(public id: string, public name: string = id) {
     }
@@ -15,17 +29,24 @@ export class TeamFortress2SceneDesc implements SceneDesc {
     public async createScene(device: GfxDevice, context: SceneContext) {
         const filesystem = await context.dataShare.ensureObject(`${tfPathBase}/SourceFileSystem`, async () => {
             const filesystem = new SourceFileSystem(context.dataFetcher);
-            // According to gameinfo.txt, it first mounts TF2 and then HL2.
-            await Promise.all([
-                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_textures`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_sound_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_sound_vo_english`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
-            ]);
+            
+            // critical: textures and misc needed for rendering
+            const critical = [
+                `${pakfilesPathBase}/tf2/tf2_textures`,
+                `${pakfilesPathBase}/tf2/tf2_misc`,
+                `${pakfilesPathBase}/hl2/hl2_textures`,
+                `${pakfilesPathBase}/hl2/hl2_misc`,
+            ];
+            
+            // optional: sounds can load in background
+            const optional = [
+                `${pakfilesPathBase}/tf2/tf2_sound_misc`,
+                `${pakfilesPathBase}/tf2/tf2_sound_vo_english`,
+                `${pakfilesPathBase}/hl2/hl2_sound_misc`,
+                `${pakfilesPathBase}/hl2/hl2_sound_vo_english`,
+            ];
+            
+            await loadVPKsWithPriority(filesystem, critical, optional);
             return filesystem;
         });
 
@@ -41,19 +62,22 @@ export class CGESceneDesc implements SceneDesc {
     public async createScene(device: GfxDevice, context: SceneContext) {
         const filesystem = await context.dataShare.ensureObject(`${pakfilesPathBase}/SourceFileSystem`, async () => {
             const filesystem = new SourceFileSystem(context.dataFetcher);
-            // According to gameinfo.txt, it first mounts TF2 and then HL2.
-            const vpkMounts = [
-                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_textures`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_sound_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/tf2/tf2_sound_vo_english`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
+            
+            const critical = [
+                `${pakfilesPathBase}/tf2/tf2_textures`,
+                `${pakfilesPathBase}/tf2/tf2_misc`,
+                `${pakfilesPathBase}/hl2/hl2_textures`,
+                `${pakfilesPathBase}/hl2/hl2_misc`,
             ];
             
-            await Promise.all(vpkMounts);
+            const optional = [
+                `${pakfilesPathBase}/tf2/tf2_sound_misc`,
+                `${pakfilesPathBase}/tf2/tf2_sound_vo_english`,
+                `${pakfilesPathBase}/hl2/hl2_sound_misc`,
+                `${pakfilesPathBase}/hl2/hl2_sound_vo_english`,
+            ];
+            
+            await loadVPKsWithPriority(filesystem, critical, optional);
             return filesystem;
         });
 
@@ -74,14 +98,19 @@ export class HalfLife2Ep2SceneDesc implements SceneDesc {
     public async createScene(device: GfxDevice, context: SceneContext) {
         const filesystem = await context.dataShare.ensureObject(`${pathEp2}/SourceFileSystem`, async () => {
             const filesystem = new SourceFileSystem(context.dataFetcher);
-            await Promise.all([
-                filesystem.createVPKMount(`${pakfilesPathBase}/ep2/ep2_pak`),
-                // filesystem.createVPKMount(`${pakfilesPathBase}/episodic/ep1_pak`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
-            ]);
+            
+            const critical = [
+                `${pakfilesPathBase}/ep2/ep2_pak`,
+                `${pakfilesPathBase}/hl2/hl2_textures`,
+                `${pakfilesPathBase}/hl2/hl2_misc`,
+            ];
+            
+            const optional = [
+                `${pakfilesPathBase}/hl2/hl2_sound_misc`,
+                `${pakfilesPathBase}/hl2/hl2_sound_vo_english`,
+            ];
+            
+            await loadVPKsWithPriority(filesystem, critical, optional);
             return filesystem;
         });
 
@@ -97,12 +126,18 @@ export class HalfLife2SceneDesc implements SceneDesc {
     public async createScene(device: GfxDevice, context: SceneContext) {
         const filesystem = await context.dataShare.ensureObject(`${pathHL2}/SourceFileSystem`, async () => {
             const filesystem = new SourceFileSystem(context.dataFetcher);
-            await Promise.all([
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
-            ]);
+            
+            const critical = [
+                `${pakfilesPathBase}/hl2/hl2_textures`,
+                `${pakfilesPathBase}/hl2/hl2_misc`,
+            ];
+            
+            const optional = [
+                `${pakfilesPathBase}/hl2/hl2_sound_misc`,
+                `${pakfilesPathBase}/hl2/hl2_sound_vo_english`,
+            ];
+            
+            await loadVPKsWithPriority(filesystem, critical, optional);
             return filesystem;
         });
 
@@ -119,15 +154,19 @@ export class CounterStrikeSourceSceneDesc implements SceneDesc {
     public async createScene(device: GfxDevice, context: SceneContext) {
         const filesystem = await context.dataShare.ensureObject(`${cstrikePathBase}/SourceFileSystem`, async () => {
             const filesystem = new SourceFileSystem(context.dataFetcher);
-            await Promise.all([
-                filesystem.createVPKMount(`${pakfilesPathBase}/cstrike/cstrike_pak`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
-
-                
-            ]);
+            
+            const critical = [
+                `${pakfilesPathBase}/cstrike/cstrike_pak`,
+                `${pakfilesPathBase}/hl2/hl2_textures`,
+                `${pakfilesPathBase}/hl2/hl2_misc`,
+            ];
+            
+            const optional = [
+                `${pakfilesPathBase}/hl2/hl2_sound_misc`,
+                `${pakfilesPathBase}/hl2/hl2_sound_vo_english`,
+            ];
+            
+            await loadVPKsWithPriority(filesystem, critical, optional);
             return filesystem;
         });
         
@@ -145,11 +184,14 @@ export class CounterStrikeGOSceneDesc implements SceneDesc {
     public async createScene(device: GfxDevice, context: SceneContext) {
         const filesystem = await context.dataShare.ensureObject(`${csgoPathBase}/SourceFileSystem`, async () => {
             const filesystem = new SourceFileSystem(context.dataFetcher);
-            await Promise.all([
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),   // include these because csgo error model is ass
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),       // include these because csgo error model is ass
-                filesystem.createVPKMount(`${pakfilesPathBase}/csgo/pak01`),
-            ]);
+            
+            const critical = [
+                `${pakfilesPathBase}/csgo/pak01`,
+                `${pakfilesPathBase}/hl2/hl2_textures`,
+                `${pakfilesPathBase}/hl2/hl2_misc`,
+            ];
+            
+            await loadVPKsWithPriority(filesystem, critical);
             return filesystem;
         });
         
@@ -166,13 +208,19 @@ export class DayOfDefeatSceneDesc implements SceneDesc {
     public async createScene(device: GfxDevice, context: SceneContext) {
         const filesystem = await context.dataShare.ensureObject(`${dodPathBase}/SourceFileSystem`, async () => {
             const filesystem = new SourceFileSystem(context.dataFetcher);
-            await Promise.all([
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_textures`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_misc`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/hl2/hl2_sound_vo_english`),
-                filesystem.createVPKMount(`${pakfilesPathBase}/dod/dod_pak`),
-            ]);
+            
+            const critical = [
+                `${pakfilesPathBase}/dod/dod_pak`,
+                `${pakfilesPathBase}/hl2/hl2_textures`,
+                `${pakfilesPathBase}/hl2/hl2_misc`,
+            ];
+            
+            const optional = [
+                `${pakfilesPathBase}/hl2/hl2_sound_misc`,
+                `${pakfilesPathBase}/hl2/hl2_sound_vo_english`,
+            ];
+            
+            await loadVPKsWithPriority(filesystem, critical, optional);
             return filesystem;
         });
 

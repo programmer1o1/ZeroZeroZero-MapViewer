@@ -3966,6 +3966,367 @@ class env_steam extends BaseEntity {
     }
 }
 
+export class game_text extends BaseEntity {
+    public static classname = `game_text`;
+    
+    private message: string = '';
+    private x: number = -1;
+    private y: number = -1;
+    private fadein: number = 0;
+    private fadeout: number = 0;
+    private holdtime: number = 2;
+    private channel: number = 1;
+    
+    private isDisplaying: boolean = false;
+    private displayStartTime: number = -1;
+    private textElement: HTMLDivElement | null = null;
+    
+    private static globalEnabled: boolean = true;
+    private static activeChannels: Map<number, game_text> = new Map();
+
+    constructor(entitySystem: EntitySystem, renderContext: SourceRenderContext, bspRenderer: BSPRenderer, entity: BSPEntity) {
+        super(entitySystem, renderContext, bspRenderer, entity);
+
+        this.message = fallbackUndefined(this.entity.message, '');
+        this.x = Number(fallbackUndefined(this.entity.x, '-1'));
+        this.y = Number(fallbackUndefined(this.entity.y, '-1'));
+        
+        this.fadein = Number(fallbackUndefined(this.entity.fadein, '0'));
+        this.fadeout = Number(fallbackUndefined(this.entity.fadeout, '0'));
+        this.holdtime = Number(fallbackUndefined(this.entity.holdtime, '2'));
+        this.channel = Number(fallbackUndefined(this.entity.channel, '1'));
+
+        this.registerInput('display', this.input_display.bind(this));
+        this.registerInput('settext', this.input_settext.bind(this));
+
+        this.createTextElement();
+    }
+
+    public static getGlobalEnabled(): boolean {
+        return game_text.globalEnabled;
+    }
+    
+    public static setGlobalEnabled(enabled: boolean): void {
+        const wasEnabled = game_text.globalEnabled;
+        game_text.globalEnabled = enabled;
+        
+        if (!enabled) {
+            for (const [channel, textEntity] of game_text.activeChannels) {
+                if (textEntity.textElement) {
+                    textEntity.textElement.style.display = 'none';
+                }
+            }
+        } else if (wasEnabled !== enabled) {
+            for (const [channel, textEntity] of game_text.activeChannels) {
+                if (textEntity.isDisplaying && textEntity.textElement) {
+                    textEntity.textElement.style.display = 'block';
+                    textEntity.updatePosition();
+                }
+            }
+        }
+    }
+
+    private createTextElement(): void {
+        this.textElement = document.createElement('div');
+        this.textElement.style.position = 'fixed';
+        this.textElement.style.pointerEvents = 'none';
+        this.textElement.style.zIndex = '10000';
+        this.textElement.style.display = 'none';
+        this.textElement.style.whiteSpace = 'pre-wrap';
+        this.textElement.style.wordWrap = 'break-word';
+        this.textElement.style.maxWidth = '80%';
+        this.textElement.style.color = 'white';
+        
+        // source engine hud font
+        this.textElement.style.fontFamily = "Trebuchet MS", "Arial", "Trebuchet MS", 'sans-serif';
+        this.textElement.style.fontSize = '18px';
+        this.textElement.style.fontWeight = '900';
+        this.textElement.style.textAlign = 'center';
+        
+        // font smoothing (cast to any for browser-specific properties)
+        (this.textElement.style as any).webkitFontSmoothing = 'antialiased';
+        (this.textElement.style as any).mozOsxFontSmoothing = 'grayscale';
+    }
+
+    private updatePosition(): void {
+        if (!this.textElement) return;
+
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        
+        if (this.x === -1) {
+            this.textElement.style.left = '50%';
+            this.textElement.style.transform = 'translateX(-50%)';
+        } else {
+            this.textElement.style.left = `${this.x * vw}px`;
+            this.textElement.style.transform = 'none';
+        }
+        
+        if (this.y === -1) {
+            this.textElement.style.top = '50%';
+            if (this.x === -1) {
+                this.textElement.style.transform = 'translate(-50%, -50%)';
+            } else {
+                this.textElement.style.transform = 'translateY(-50%)';
+            }
+        } else {
+            this.textElement.style.top = `${this.y * vh}px`;
+        }
+    }
+
+    private startDisplay(entitySystem: EntitySystem): void {
+        if (!this.textElement) return;
+        
+        const existing = game_text.activeChannels.get(this.channel);
+        if (existing && existing !== this) {
+            existing.stopDisplay();
+        }
+        
+        this.isDisplaying = true;
+        this.displayStartTime = entitySystem.currentTime;
+        game_text.activeChannels.set(this.channel, this);
+        
+        let text = this.message.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+        this.textElement.innerText = text;
+        
+        if (game_text.globalEnabled) {
+            this.textElement.style.display = 'block';
+        }
+        
+        if (!this.textElement.parentElement) {
+            document.body.appendChild(this.textElement);
+        }
+        
+        this.updatePosition();
+    }
+
+    private stopDisplay(): void {
+        if (!this.textElement) return;
+        
+        this.isDisplaying = false;
+        this.displayStartTime = -1;
+        this.textElement.style.display = 'none';
+        
+        if (game_text.activeChannels.get(this.channel) === this) {
+            game_text.activeChannels.delete(this.channel);
+        }
+    }
+
+    public override movement(entitySystem: EntitySystem, renderContext: SourceRenderContext): void {
+        super.movement(entitySystem, renderContext);
+        
+        if (!this.isDisplaying || !this.textElement) {
+            return;
+        }
+        
+        const elapsed = entitySystem.currentTime - this.displayStartTime;
+        const totalTime = this.fadein + this.holdtime + this.fadeout;
+        
+        if (elapsed >= totalTime) {
+            this.stopDisplay();
+            return;
+        }
+        
+        if (!game_text.globalEnabled) {
+            if (this.textElement.style.display !== 'none') {
+                this.textElement.style.display = 'none';
+            }
+            return;
+        } else {
+            if (this.textElement.style.display === 'none') {
+                this.textElement.style.display = 'block';
+            }
+        }
+        
+        let alpha = 1.0;
+        
+        if (elapsed < this.fadein) {
+            alpha = elapsed / this.fadein;
+        } else if (elapsed < this.fadein + this.holdtime) {
+            alpha = 1.0;
+        } else {
+            const fadeOutElapsed = elapsed - this.fadein - this.holdtime;
+            alpha = 1.0 - (fadeOutElapsed / this.fadeout);
+        }
+        
+        alpha = saturate(alpha);
+        this.textElement.style.opacity = `${alpha}`;
+        
+        this.updatePosition();
+    }
+
+    private input_display(entitySystem: EntitySystem, activator: BaseEntity): void {
+        this.startDisplay(entitySystem);
+    }
+
+    private input_settext(entitySystem: EntitySystem, activator: BaseEntity, value: string): void {
+        this.message = value;
+        if (this.isDisplaying && this.textElement) {
+            this.textElement.innerText = value.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+        }
+    }
+
+    public override destroy(device: GfxDevice): void {
+        super.destroy(device);
+        
+        if (this.textElement && this.textElement.parentElement) {
+            this.textElement.parentElement.removeChild(this.textElement);
+        }
+        this.textElement = null;
+        
+        if (game_text.activeChannels.get(this.channel) === this) {
+            game_text.activeChannels.delete(this.channel);
+        }
+    }
+}
+
+// we are not really in the game but would be nice to implement
+export class ServerCommandLogger {
+    private static element: HTMLDivElement | null = null;
+    private static enabled: boolean = false;
+    private static messages: Array<{ text: string, timestamp: number }> = [];
+    private static maxMessages: number = 10;
+    private static messageDuration: number = 5000;
+
+    public static getEnabled(): boolean {
+        return ServerCommandLogger.enabled;
+    }
+    
+    public static setEnabled(enabled: boolean): void {
+        ServerCommandLogger.enabled = enabled;
+        
+        if (enabled) {
+            if (!ServerCommandLogger.element) {
+                ServerCommandLogger.createLogElement();
+            }
+            if (ServerCommandLogger.element) {
+                ServerCommandLogger.element.style.display = 'block';
+            }
+        } else {
+            if (ServerCommandLogger.element) {
+                ServerCommandLogger.element.style.display = 'none';
+            }
+        }
+    }
+
+    private static createLogElement(): void {
+        if (ServerCommandLogger.element) return;
+        
+        ServerCommandLogger.element = document.createElement('div');
+        ServerCommandLogger.element.style.position = 'fixed';
+        ServerCommandLogger.element.style.top = '10px';
+        ServerCommandLogger.element.style.right = '10px';
+        ServerCommandLogger.element.style.minWidth = '300px';
+        ServerCommandLogger.element.style.maxWidth = '500px';
+        ServerCommandLogger.element.style.padding = '10px';
+        ServerCommandLogger.element.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+        ServerCommandLogger.element.style.color = '#00ff00';
+        ServerCommandLogger.element.style.fontFamily = '"Courier New", monospace';
+        ServerCommandLogger.element.style.fontSize = '12px';
+        ServerCommandLogger.element.style.zIndex = '9999';
+        ServerCommandLogger.element.style.pointerEvents = 'none';
+        ServerCommandLogger.element.style.borderLeft = '3px solid #00ff00';
+        ServerCommandLogger.element.style.overflowY = 'auto';
+        ServerCommandLogger.element.style.maxHeight = '300px';
+        ServerCommandLogger.element.innerHTML = '<div style="opacity: 0.5;">server command log (empty)</div>';
+        
+        document.body.appendChild(ServerCommandLogger.element);
+        
+        console.log('ServerCommandLogger: element created and appended to body');
+    }
+
+    public static log(message: string): void {
+        console.log('ServerCommandLogger.log called:', message, 'enabled:', ServerCommandLogger.enabled);
+        
+        if (!ServerCommandLogger.enabled) {
+            console.log('ServerCommandLogger: not enabled, skipping');
+            return;
+        }
+        
+        // ensure element exists
+        if (!ServerCommandLogger.element) {
+            console.log('ServerCommandLogger: element does not exist, creating');
+            ServerCommandLogger.createLogElement();
+        }
+        
+        const timestamp = Date.now();
+        ServerCommandLogger.messages.push({ text: message, timestamp });
+        
+        if (ServerCommandLogger.messages.length > ServerCommandLogger.maxMessages) {
+            ServerCommandLogger.messages.shift();
+        }
+        
+        console.log('ServerCommandLogger: messages count:', ServerCommandLogger.messages.length);
+        ServerCommandLogger.update();
+    }
+
+    private static update(): void {
+        if (!ServerCommandLogger.element) {
+            console.log('ServerCommandLogger.update: no element');
+            return;
+        }
+        
+        const now = Date.now();
+        const activeMessages = ServerCommandLogger.messages.filter(msg => 
+            now - msg.timestamp < ServerCommandLogger.messageDuration
+        );
+        
+        ServerCommandLogger.messages = activeMessages;
+        
+        if (activeMessages.length === 0) {
+            ServerCommandLogger.element.innerHTML = '<div style="opacity: 0.5;">server command log (empty)</div>';
+            return;
+        }
+        
+        let html = '<div style="opacity: 0.5; margin-bottom: 5px; border-bottom: 1px solid #00ff00; padding-bottom: 3px;">server command log:</div>';
+        
+        for (const msg of activeMessages) {
+            const age = now - msg.timestamp;
+            const opacity = Math.max(0.3, 1 - (age / ServerCommandLogger.messageDuration));
+            const escapedMsg = msg.text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            html += `<div style="opacity: ${opacity}; margin: 2px 0; word-wrap: break-word;">&gt; ${escapedMsg}</div>`;
+        }
+        
+        ServerCommandLogger.element.innerHTML = html;
+        console.log('ServerCommandLogger.update: updated with', activeMessages.length, 'messages');
+    }
+
+    public static tick(): void {
+        if (ServerCommandLogger.enabled && ServerCommandLogger.messages.length > 0) {
+            ServerCommandLogger.update();
+        }
+    }
+
+    public static destroy(): void {
+        if (ServerCommandLogger.element && ServerCommandLogger.element.parentElement) {
+            ServerCommandLogger.element.parentElement.removeChild(ServerCommandLogger.element);
+        }
+        ServerCommandLogger.element = null;
+        ServerCommandLogger.messages = [];
+    }
+}
+
+class point_servercommand extends BaseEntity {
+    public static classname = `point_servercommand`;
+
+    constructor(entitySystem: EntitySystem, renderContext: SourceRenderContext, bspRenderer: BSPRenderer, entity: BSPEntity) {
+        super(entitySystem, renderContext, bspRenderer, entity);
+
+        this.registerInput('command', this.input_command.bind(this));
+    }
+
+    private input_command(entitySystem: EntitySystem, activator: BaseEntity, value: string): void {
+        console.log(`point_servercommand executing: "${value}"`);
+        
+        ServerCommandLogger.log(value);
+        
+        if (value.startsWith('exec ')) {
+            const filename = value.substring(5).trim();
+            ServerCommandLogger.log(`  -> load config: ${filename}`);
+        }
+    }
+}
+
 const enum env_citadel_energy_core_state { Idle, Charging, Discharging }
 class env_citadel_energy_core extends BaseEntity {
     public static classname = `env_citadel_energy_core`;
@@ -5188,6 +5549,8 @@ export class EntityFactoryRegistry {
         this.registerFactory(env_sprite_clientside);
         this.registerFactory(env_tonemap_controller);
         this.registerFactory(env_projectedtexture);
+        this.registerFactory(point_servercommand);
+        this.registerFactory(game_text);
         this.registerFactory(env_shake);
         this.registerFactory(fog_volume);
         this.registerFactory(point_camera);

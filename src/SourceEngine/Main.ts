@@ -21,8 +21,7 @@ import { arrayRemove, assert, assertExists, nArray } from "../util.js";
 import { SceneGfx, ViewerRenderInput } from "../viewer.js";
 import { ZipFile, decompressZipFileEntry, parseZipFile } from "../ZipFile.js";
 import { BSPFile, BSPFileVariant, Model, BSPSurface } from "./BSPFile.js";
-import { BaseEntity, calcFrustumViewProjection, EntityFactoryRegistry, EntitySystem, env_projectedtexture, env_shake, point_camera, sky_camera, trigger_multiple, trigger_once, trigger_look, worldspawn } from "./EntitySystem.js";
-import { DetailPropLeafRenderer, StaticPropRenderer } from "./StaticDetailObject.js";
+import { BaseEntity, calcFrustumViewProjection, EntityFactoryRegistry, EntitySystem, env_projectedtexture, env_shake, point_camera, sky_camera, trigger_multiple, trigger_once, trigger_look, worldspawn, game_text, ServerCommandLogger } from './EntitySystem.js';import { DetailPropLeafRenderer, StaticPropRenderer } from "./StaticDetailObject.js";
 import { StudioModelCache } from "./Studio.js";
 import { createVPKMount, VPKMount } from "./VPK.js";
 import { GfxShaderLibrary } from "../gfx/helpers/GfxShaderLibrary.js";
@@ -76,10 +75,8 @@ export class SourceFileSystem {
     }
 
     public async createVPKMount(path: string) {
-        // This little dance here is to ensure that priorities are correctly ordered.
-        const dummyMount = null!;
-        const i = this.vpk.push(dummyMount) - 1;
-        this.vpk[i] = await createVPKMount(this.dataFetcher, path);
+        const mount = await createVPKMount(this.dataFetcher, path);
+        this.vpk.push(mount);
     }
 
     public addPakFile(pakfile: ZipFile): void {
@@ -1876,6 +1873,8 @@ export class SourceRenderer implements SceneGfx {
             this.bspRenderers[i].movement(this.renderContext);
 
         this.renderContext.currentView = null!;
+
+        ServerCommandLogger.tick();
     }
 
     private resetViews(): void {
@@ -1965,6 +1964,18 @@ export class SourceRenderer implements SceneGfx {
             }
         };
         renderHacksPanel.contents.appendChild(useFixedTextures.elem);
+
+        const showGameText = new UI.Checkbox('Show game_text Messages', game_text.getGlobalEnabled());
+        showGameText.onchanged = () => {
+            game_text.setGlobalEnabled(showGameText.checked);
+        };
+        renderHacksPanel.contents.appendChild(showGameText.elem);
+        
+        const showServerCommands = new UI.Checkbox('Show Server Commands', ServerCommandLogger.getEnabled());
+        showServerCommands.onchanged = () => {
+            ServerCommandLogger.setEnabled(showServerCommands.checked);
+        };
+        renderHacksPanel.contents.appendChild(showServerCommands.elem);
 
         renderHacksPanel.contents.appendChild(enableExtensiveWater.elem);
         const showToolMaterials = new UI.Checkbox('Show Tool-only Materials', false);
