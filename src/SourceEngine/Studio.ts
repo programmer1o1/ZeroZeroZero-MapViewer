@@ -1124,10 +1124,12 @@ export class StudioModelData {
 
             const resolvedPath = renderContext.filesystem.searchPath(materialSearchDirs, materialName, '.vmt');
             if (resolvedPath !== null) {
+                // console.log('loaded', materialSearchDirs, materialName)
                 baseMaterialNames.push(resolvedPath);
             } else {
                 // TODO(jstpierre): Error material
-                baseMaterialNames.push('materials/editor/obsolete.vmt');
+                console.log('Failed to load', materialSearchDirs, materialName)
+                baseMaterialNames.push('materials/debug/debugempty.vmt');
             }
 
             textureIdx += 0x40;
@@ -1756,16 +1758,17 @@ export class StudioModelCache {
                 // Fetch external animation block.
                 const aniPath = this.filesystem.resolvePath(modelData.animBlockName, '.ani');
                 const aniBuffer = (await this.filesystem.fetchFileData(aniPath))!;
-
-                // Go through each of our animations and set the relevant animation data.
-                for (let i = 0; i < modelData.anim.length; i++) {
-                    for (let j = 0; j < modelData.anim[i].animsection.length; j++) {
-                        const animsection = modelData.anim[i].animsection[j];
-                        if (animsection.animdata === null) {
-                            assert(animsection.animblock > 0);
-                            const animblock = modelData.animblocks[animsection.animblock];
-                            const blockBuffer = aniBuffer.slice(animblock.dataStart, animblock.dataEnd);
-                            animsection.animdata = new AnimData(blockBuffer.slice(animsection.animindex), modelData.bone);
+                if (aniBuffer != null){
+                    // Go through each of our animations and set the relevant animation data.
+                    for (let i = 0; i < modelData.anim.length; i++) {
+                        for (let j = 0; j < modelData.anim[i].animsection.length; j++) {
+                            const animsection = modelData.anim[i].animsection[j];
+                            if (animsection.animdata === null) {
+                                assert(animsection.animblock > 0);
+                                const animblock = modelData.animblocks[animsection.animblock];
+                                const blockBuffer = aniBuffer.slice(animblock.dataStart, animblock.dataEnd);
+                                animsection.animdata = new AnimData(blockBuffer.slice(animsection.animindex), modelData.bone);
+                            }
                         }
                     }
                 }

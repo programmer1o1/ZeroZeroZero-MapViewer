@@ -30,7 +30,7 @@ import { debugJunk } from './DebugJunk.js';
 import { IS_DEVELOPMENT } from './BuildVersion.js';
 
 const sceneGroups: (string | SceneGroup)[] = [
-    "Anomi",
+    "Interloper",
     Scenes_InitialManifest.sceneGroup,
     Scenes_TuesdayManifest.sceneGroup,
     Scenes_CGE.sceneGroup,

@@ -66,6 +66,7 @@ const sceneDescs = [
     new CGESceneDesc('ord_cry'),
     new CGESceneDesc('ord_laugh'),
     new CGESceneDesc('ord_end'),
+    new CGESceneDesc('ord_play'),
     "Sacrifice Maps",
     new CGESceneDesc('vul8ty7643'),
     new CGESceneDesc('vul3sdg66'),
