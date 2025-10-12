@@ -1221,7 +1221,10 @@ export class SourceRenderContext {
     public useFixedTextures = false;
     private fixedTextureVPKs = [
         `${pakfilesPathBase}/tf2/plotmas_d`,
-        `${pakfilesPathBase}/tf2/stork`
+        `${pakfilesPathBase}/tf2/stork`,
+		`${pakfilesPathBase}/tf2/data3fix`,
+		`${pakfilesPathBase}/tf2/data6fix`,
+		`${pakfilesPathBase}/tf2/fortressfix`
     ];
     private parentRenderer: SourceRenderer | null = null;
 
@@ -1288,6 +1291,17 @@ export class SourceRenderContext {
                 await bspRenderer.reloadMaterials(this);
             }
         }
+        // disable hall of mirrors effect for data3 maps since it wont load the right skybox
+		// yes this is a hacky way of checking the map shush
+        if (this.parentRenderer) {
+            for (const bspRenderer of this.parentRenderer.bspRenderers) {
+                const skyName = bspRenderer.getWorldSpawn().skyname;
+                if (skyName === 'sky_ep01_04a') {
+                    this.enableSkyBleed = false;
+                }
+            }
+        }
+
     }
 
    public async cleanup(): Promise<void> {
@@ -1939,7 +1953,7 @@ export class SourceRenderer implements SceneGfx {
             this.renderContext.enableExpensiveWater = v;
         };
 
-        const useFixedTextures = new UI.Checkbox('Use Fixed Textures (CGE)', SourceRenderer.fixedTexturesEnabled);
+        const useFixedTextures = new UI.Checkbox('Use Fixed Textures', SourceRenderer.fixedTexturesEnabled);
         let isTogglingTextures = false;
         
         useFixedTextures.onchanged = async () => {
