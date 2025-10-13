@@ -372,6 +372,24 @@ export function paramGetNum(map: ParameterMap, ref: ParameterReference): number 
     return paramLookup<ParameterNumber>(map, ref).value;
 }
 
+function paramSetBinOp(map: ParameterMap, dstRef: ParameterReference, src1Ref: ParameterReference, src2Ref: ParameterReference, func: (a: number, b: number) => number): void {
+    const dst = paramLookup(map, dstRef);
+    const src1 = paramLookup(map, src1Ref);
+    const src2 = paramLookup(map, src2Ref);
+
+    if (src1 instanceof ParameterVector) {
+        assert(dst instanceof ParameterVector);
+        for (let i = 0; i < dst.internal.length; i++)
+            dst.internal[i].value = func(src1.get(i), (src2 instanceof ParameterVector) ? src2.get(i) : (src2 as ParameterNumber).value);
+    } else if (src2 instanceof ParameterVector) {
+        assert(dst instanceof ParameterVector);
+        for (let i = 0; i < dst.internal.length; i++)
+            dst.internal[i].value = func((src1 instanceof ParameterVector) ? src1.get(i) : (src1 as ParameterNumber).value, src2.get(i));
+    } else {
+        paramSetNum(map, dstRef, func((src1 as ParameterNumber).value, (src2 as ParameterNumber).value));
+    }
+}
+
 export function paramSetNum(map: ParameterMap, ref: ParameterReference, v: number): void {
     const param = paramLookupOptional(map, ref);
     if (param === null) {
@@ -422,6 +440,8 @@ export class MaterialProxySystem {
         this.registerProxyFactory(MaterialProxy_ToggleTexture);
         this.registerProxyFactory(MaterialProxy_EntityRandom);
         this.registerProxyFactory(MaterialProxy_FizzlerVortex);
+        this.registerProxyFactory(MaterialProxy_YellowLevel);
+        this.registerProxyFactory(MaterialProxy_BurnLevel);
     }
 
     public registerProxyFactory(factory: MaterialProxyFactory): void {
@@ -449,6 +469,8 @@ export class MaterialProxyDriver {
     }
 
     public update(renderContext: SourceRenderContext, entityParams: EntityMaterialParameters | null): void {
+        if ((this as any).debug)
+            debugger;
         for (let i = 0; i < this.proxies.length; i++)
             this.proxies[i].update(this.material.param, renderContext, entityParams);
     }
@@ -490,7 +512,7 @@ class MaterialProxy_Add {
     }
 
     public update(map: ParameterMap, renderContext: SourceRenderContext): void {
-        paramSetNum(map, this.resultvar, paramGetNum(map, this.srcvar1) + paramGetNum(map, this.srcvar2));
+        paramSetBinOp(map, this.resultvar, this.srcvar1, this.srcvar2, (a, b) => a + b);
     }
 }
 
@@ -508,7 +530,7 @@ class MaterialProxy_Subtract {
     }
 
     public update(map: ParameterMap, renderContext: SourceRenderContext): void {
-        paramSetNum(map, this.resultvar, paramGetNum(map, this.srcvar1) - paramGetNum(map, this.srcvar2));
+        paramSetBinOp(map, this.resultvar, this.srcvar1, this.srcvar2, (a, b) => a - b);
     }
 }
 
@@ -526,7 +548,7 @@ class MaterialProxy_Multiply {
     }
 
     public update(map: ParameterMap, renderContext: SourceRenderContext): void {
-        paramSetNum(map, this.resultvar, paramGetNum(map, this.srcvar1) * paramGetNum(map, this.srcvar2));
+        paramSetBinOp(map, this.resultvar, this.srcvar1, this.srcvar2, (a, b) => a * b);
     }
 }
 
@@ -942,6 +964,32 @@ class MaterialProxy_FizzlerVortex {
         if (param === undefined)
             return;
         param.value = 1.0;
+    }
+}
+class MaterialProxy_YellowLevel {
+    public static type = `yellowlevel`;
+
+    private resultvar: ParameterReference;
+
+    constructor(params: VKFParamMap) {
+        this.resultvar = new ParameterReference(params.resultvar);
+    }
+
+    public update(map: ParameterMap, renderContext: SourceRenderContext, entityParams: EntityMaterialParameters | null): void {
+        paramSetNum(map, this.resultvar, 1);
+    }
+}
+class MaterialProxy_BurnLevel {
+    public static type = `burnlevel`;
+
+    private resultvar: ParameterReference;
+
+    constructor(params: VKFParamMap) {
+        this.resultvar = new ParameterReference(params.resultvar);
+    }
+
+    public update(map: ParameterMap, renderContext: SourceRenderContext, entityParams: EntityMaterialParameters | null): void {
+        paramSetNum(map, this.resultvar, 0);
     }
 }
 //#endregion
