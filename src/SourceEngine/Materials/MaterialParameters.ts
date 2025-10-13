@@ -404,6 +404,8 @@ export class MaterialProxySystem {
         this.registerProxyFactory(MaterialProxy_Add);
         this.registerProxyFactory(MaterialProxy_Subtract);
         this.registerProxyFactory(MaterialProxy_Multiply);
+        this.registerProxyFactory(MaterialProxy_Invis);
+        this.registerProxyFactory(MaterialProxy_SpyInvis);
         this.registerProxyFactory(MaterialProxy_Clamp);
         this.registerProxyFactory(MaterialProxy_Abs);
         this.registerProxyFactory(MaterialProxy_LessOrEqual);
@@ -527,6 +529,26 @@ class MaterialProxy_Multiply {
         paramSetNum(map, this.resultvar, paramGetNum(map, this.srcvar1) * paramGetNum(map, this.srcvar2));
     }
 }
+
+
+class MaterialProxy_Invis {
+    public static type = 'invis';
+
+
+    public update(map: ParameterMap, renderContext: SourceRenderContext, entityParams: EntityMaterialParameters | null): void {
+        // Nothing to do
+    }
+}
+
+
+class MaterialProxy_SpyInvis {
+    public static type = 'spy_invis';
+
+    public update(map: ParameterMap, renderContext: SourceRenderContext, entityParams: EntityMaterialParameters | null): void {
+        // Nothing to do
+    }
+}
+
 
 class MaterialProxy_Clamp {
     public static type = 'clamp';
