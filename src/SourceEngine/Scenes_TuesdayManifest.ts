@@ -20,7 +20,6 @@ const sceneDescs = [
     new TeamFortress2SceneDesc('tf_data6', 'data6 - City - Unfixed Lighting'),
 	new TeamFortress2SceneDesc('tf_data6_d', 'data6 - City - Fixed Lighting'),
     new TeamFortress2SceneDesc('tf_data7', 'data7 - Gravel Grave'),
-	new TeamFortress2SceneDesc('background01', 'background01'),
 
     "Half-Life 2",
     new HalfLife2SceneDesc('hl2_data', 'data - Area Portal'),
