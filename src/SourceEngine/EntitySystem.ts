@@ -5083,7 +5083,7 @@ class ambient_generic extends BaseEntity {
     private startsound(): void {
         this.stopsound()
         this.source = this.audioContext.createBufferSource();
-        this.source.playbackRate.value = this.pitch / 100;
+        this.source.playbackRate.value = this.pitch / 100 * this.audrate;
         this.source.buffer = this.audioBuffer;
         this.source.connect(this.gain).connect(this.audioContext.destination);
         this.source.start(0, this.audtime)
@@ -5116,7 +5116,8 @@ class ambient_generic extends BaseEntity {
         super.movement(entitySystem, renderContext);
         if (this.audioBuffer !== null) {
             if (this.isPlaying) {
-                this.audtime += renderContext.globalDeltaTime * this.audrate;
+                this.audrate = renderContext.globalTimeScale;
+                this.audtime += renderContext.globalDeltaTime;
                 
                 if (this.playEverywhere){
                     this.gain.gain.value = this.volume / 10;

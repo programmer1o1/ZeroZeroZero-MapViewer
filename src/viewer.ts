@@ -40,6 +40,7 @@ export interface ViewerRenderInput {
     camera: Camera;
     time: number;
     deltaTime: number;
+    timeScale: number;
     backbufferWidth: number;
     backbufferHeight: number;
     onscreenTexture: GfxTexture;
@@ -117,6 +118,7 @@ export class Viewer {
         this.viewerRenderInput = {
             camera: this.camera,
             time: this.sceneTime,
+            timeScale: this.sceneTimeScale,
             deltaTime: 0,
             backbufferWidth: 0,
             backbufferHeight: 0,
@@ -305,6 +307,7 @@ export class Viewer {
         }
 
         const deltaTime = dt * this.sceneTimeScale;
+        this.viewerRenderInput.timeScale = this.sceneTimeScale;
         this.viewerRenderInput.deltaTime += deltaTime;
         this.sceneTime += deltaTime;
 

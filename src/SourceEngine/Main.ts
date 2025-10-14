@@ -1208,6 +1208,7 @@ export class SourceRenderContext {
     public worldLightingState = new WorldLightingState();
     public globalTime: number = 0;
     public globalDeltaTime: number = 0;
+    public globalTimeScale: number = 1;
     public materialProxySystem = new MaterialProxySystem();
     public cheapWaterStartDistance = 0.0;
     public cheapWaterEndDistance = 0.1;
@@ -2068,6 +2069,7 @@ export class SourceRenderer implements SceneGfx {
         // globalTime is in seconds.
         renderContext.globalTime = viewerInput.time / 1000.0;
         renderContext.globalDeltaTime = viewerInput.deltaTime / 1000.0;
+        renderContext.globalTimeScale = viewerInput.timeScale;
         renderContext.debugStatistics.reset();
 
         // Update the main view early, since that's what movement/entities will use
