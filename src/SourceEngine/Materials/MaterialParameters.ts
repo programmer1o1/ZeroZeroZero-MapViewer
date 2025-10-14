@@ -422,6 +422,7 @@ export class MaterialProxySystem {
         this.registerProxyFactory(MaterialProxy_Add);
         this.registerProxyFactory(MaterialProxy_Subtract);
         this.registerProxyFactory(MaterialProxy_Multiply);
+		this.registerProxyFactory(MaterialProxy_Divide);
         this.registerProxyFactory(MaterialProxy_Invis);
         this.registerProxyFactory(MaterialProxy_SpyInvis);
         this.registerProxyFactory(MaterialProxy_Clamp);
@@ -536,6 +537,24 @@ class MaterialProxy_Subtract {
 
 class MaterialProxy_Multiply {
     public static type = 'multiply';
+
+    private srcvar1: ParameterReference;
+    private srcvar2: ParameterReference;
+    private resultvar: ParameterReference;
+
+    constructor(params: VKFParamMap) {
+        this.srcvar1 = new ParameterReference(params.srcvar1);
+        this.srcvar2 = new ParameterReference(params.srcvar2);
+        this.resultvar = new ParameterReference(params.resultvar);
+    }
+
+    public update(map: ParameterMap, renderContext: SourceRenderContext): void {
+        paramSetBinOp(map, this.resultvar, this.srcvar1, this.srcvar2, (a, b) => a * b);
+    }
+}
+
+class MaterialProxy_Divide {
+    public static type = 'divide';
 
     private srcvar1: ParameterReference;
     private srcvar2: ParameterReference;
