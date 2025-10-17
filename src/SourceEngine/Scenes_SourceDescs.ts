@@ -44,6 +44,7 @@ export class TeamFortress2SceneDesc implements SceneDesc {
                 `${pakfilesPathBase}/tf2/tf2_sound_vo_english`,
                 `${pakfilesPathBase}/hl2/hl2_sound_misc`,
                 `${pakfilesPathBase}/hl2/hl2_sound_vo_english`,
+				`${pakfilesPathBase}/tf2/fortressfix`,
             ];
             
             await loadVPKsWithPriority(filesystem, critical, optional);
