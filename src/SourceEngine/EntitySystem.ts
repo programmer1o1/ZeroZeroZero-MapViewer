@@ -5012,6 +5012,7 @@ class ambient_generic extends BaseEntity {
     private source: AudioBufferSourceNode;
     private gain: GainNode;
     private paused: boolean = true;
+    private muted: boolean = true;
 
     private volume: number = 10;
     private maxDistance: number = 10000;
@@ -5120,11 +5121,20 @@ class ambient_generic extends BaseEntity {
                 this.audtime += renderContext.globalDeltaTime;
                 
                 if (this.playEverywhere){
-                    this.gain.gain.value = this.volume / 10;
+                    this.gain.gain.value = renderContext.globalVolume * this.volume / 10;
                 } else {
                     const dist = this.getDistanceToPlayer(entitySystem)
                     const distVol = clamp((this.maxDistance - dist) / this.maxDistance,0,1)
-                    this.gain.gain.value = distVol * this.volume / 10;
+                    this.gain.gain.value = renderContext.globalVolume * distVol * this.volume / 10;
+                }
+
+                if (renderContext.isMuted && !this.muted){
+                    this.muted = true
+                    if (!this.paused) this.stopsound();
+                }
+                if (!renderContext.isMuted && this.muted){
+                    this.muted = false
+                    if (!this.paused) this.startsound();
                 }
 
                 if (this.audtime < 0) this.audtime = 0;
@@ -5134,12 +5144,12 @@ class ambient_generic extends BaseEntity {
                     this.paused = true;
                 }
                 if (renderContext.globalDeltaTime > 0 && this.paused){
-                    this.startsound()
+                    if (!this.muted) this.startsound()
                     this.paused = false;
                 }
                 if (this.loop && this.audtime >= this.audioBuffer.duration){
                     this.audtime -= this.audioBuffer.duration
-                    this.startsound()
+                    if (!this.muted) this.startsound()
                 }
                 
             }

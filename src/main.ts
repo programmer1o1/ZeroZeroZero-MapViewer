@@ -155,6 +155,8 @@ class Main {
 
     public sceneTimeScale = 1.0;
     private isPlaying = false;
+    private volume = 1;
+    private isMuted = true;
     private isFrameStep = false;
 
     public isEmbedMode = false;
@@ -255,6 +257,14 @@ class Main {
 
         if (IS_DEVELOPMENT)
             this._saveCurrentTimeState(this._getCurrentSceneDescId()!);
+    }
+
+    private setIsMuted(v: boolean): void {
+        if (this.isMuted === v)
+            return;
+        this.isMuted = v;
+        this.viewer.setIsMuted(v);
+        this.ui.muteButton.setIsMuted(v);
     }
 
     private _decodeHashString(hashString: string): [string, string] {
@@ -722,6 +732,7 @@ class Main {
         this.ui.sceneSelect.onscenedescselected = this._onSceneDescSelected.bind(this);
         this.ui.xrSettings.onWebXRStateRequested = this._onWebXRStateRequested.bind(this);
         this.ui.playPauseButton.onplaypause = this.setIsPlaying.bind(this);
+        this.ui.muteButton.onmute = this.setIsMuted.bind(this);
 
         this.webXRContext.onsupportedchanged = () => {
             this._syncWebXRSettingsVisible();

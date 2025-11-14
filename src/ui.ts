@@ -28,12 +28,15 @@ export function createDOMFromString(s: string): DocumentFragment {
 }
 
 const enum FontelloIcon {
-    share = '\ue800',
-    resize_full = '\ue801',
-    pause = '\ue802',
-    resize_small = '\ue803',
-    play = '\ue804',
-    fast_backward = '\ue805',
+    volume_down = '\ue800',
+    volume_up = '\ue801',
+    volume_off = '\ue802',
+    resize_full = '\ue803',
+    resize_small = '\ue804',
+    pause = '\ue805',
+    play = '\ue806',
+    share = '\ue807',
+    fast_backward = '\ue808',
 };
 
 function setFontelloIcon(elem: HTMLElement, icon: FontelloIcon): void {
@@ -2534,7 +2537,7 @@ abstract class SingleIconButton implements BottomBarWidget {
         this.icon.style.width = '32px';
         this.icon.style.height = '32px';
         this.icon.style.cursor = 'pointer';
-        this.icon.style.font = '16px monospace';
+        this.icon.style.font = '16px fontello';
         this.icon.style.color = 'white';
         this.icon.style.lineHeight = '32px';
         this.icon.style.textAlign = 'center';
@@ -2763,6 +2766,33 @@ class PlayPauseButton extends SingleIconButton {
     }
 }
 
+class MuteButton extends SingleIconButton {
+    public onmute: ((shouldBeMuted: boolean) => void) | null = null;
+    public isMuted: boolean = true;
+
+    public constructor() {
+        super();
+        this.syncStyle();
+    }
+
+    public override syncStyle(): void {
+        super.syncStyle();
+        setFontelloIcon(this.icon, this.isMuted ? FontelloIcon.volume_off : FontelloIcon.volume_up);
+        this.tooltipElem.textContent = this.isMuted ? 'Unmute' : 'Mute';
+    }
+
+    public setIsMuted(isMuted: boolean): void {
+        this.isMuted = isMuted;
+        this.syncStyle();
+    }
+
+    public onClick() {
+        if (this.onmute !== null) {
+            this.onmute(!this.isMuted);
+        }
+    }
+}
+
 class RecordingBranding {
     public elem: HTMLElement;
 
@@ -2781,7 +2811,7 @@ class RecordingBranding {
         this.elem.style.textShadow = '0px 0px 10px rgba(0, 0, 0, 0.8)';
         this.elem.style.visibility = 'hidden';
         this.elem.style.userSelect = 'none';
-        this.elem.textContent = '[ noclip.website ]';
+        this.elem.textContent = '[ gaq9.com ]';
     }
 
     public v(): void {
@@ -2816,6 +2846,7 @@ export class UI {
     public cameraSpeedIndicator = new CameraSpeedIndicator();
     private bottomBar = new BottomBar();
     public playPauseButton = new PlayPauseButton();
+    public muteButton = new MuteButton();
     private shareButton = new ShareButton();
     private fullscreenButton = new FullscreenButton();
 
@@ -2882,6 +2913,7 @@ export class UI {
         this.toplevel.appendChild(this.bottomBar.elem);
         this.bottomBar.addWidgets(BottomBarArea.Left, this.cameraSpeedIndicator);
         this.bottomBar.addWidgets(BottomBarArea.Center, this.playPauseButton);
+        this.bottomBar.addWidgets(BottomBarArea.Center, this.muteButton);
         this.bottomBar.addWidgets(BottomBarArea.Right, this.shareButton);
         this.bottomBar.addWidgets(BottomBarArea.Right, this.fullscreenButton);
 
@@ -2916,6 +2948,10 @@ export class UI {
 
     public setIsPlaying(v: boolean): void {
         this.playPauseButton.setIsPlaying(v);
+    }
+
+    public setIsMuted(v: boolean): void {
+        this.muteButton.setIsMuted(v);
     }
 
     public toggleWebXRCheckbox(shouldBeChecked: boolean = !this.xrSettings.enableXRCheckBox.checked) {
@@ -3029,6 +3065,7 @@ export class UI {
         this.bottomBar.setActive(this.shouldBottomBarBeFadeIn());
 
         this.playPauseButton.setVisible(this.hasScene);
+        this.muteButton.setVisible(this.hasScene);
 
         const extraButtonsVisible = !this.isEmbedMode;
         this.cameraSpeedIndicator.setVisible(extraButtonsVisible);

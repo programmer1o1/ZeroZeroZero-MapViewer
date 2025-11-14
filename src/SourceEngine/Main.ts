@@ -1209,6 +1209,8 @@ export class SourceRenderContext {
     public globalTime: number = 0;
     public globalDeltaTime: number = 0;
     public globalTimeScale: number = 1;
+    public globalVolume: number = 1;
+    public isMuted: boolean = true;
     public materialProxySystem = new MaterialProxySystem();
     public cheapWaterStartDistance = 0.0;
     public cheapWaterEndDistance = 0.1;
@@ -2070,6 +2072,8 @@ export class SourceRenderer implements SceneGfx {
         renderContext.globalTime = viewerInput.time / 1000.0;
         renderContext.globalDeltaTime = viewerInput.deltaTime / 1000.0;
         renderContext.globalTimeScale = viewerInput.timeScale;
+        renderContext.globalVolume = viewerInput.volume;
+        renderContext.isMuted = viewerInput.isMuted;
         renderContext.debugStatistics.reset();
 
         // Update the main view early, since that's what movement/entities will use

@@ -1,7 +1,10 @@
 
-.icon-share:before { content: '\e800'; } /* '' */
-.icon-resize-full:before { content: '\e801'; } /* '' */
-.icon-pause:before { content: '\e802'; } /* '' */
-.icon-resize-small-1:before { content: '\e803'; } /* '' */
-.icon-play:before { content: '\e804'; } /* '' */
-.icon-fast-backward:before { content: '\e805'; } /* '' */
+.icon-volume-down:before { content: '\e800'; } /* '' */
+.icon-volume-up:before { content: '\e801'; } /* '' */
+.icon-volume-off:before { content: '\e802'; } /* '' */
+.icon-resize-full:before { content: '\e803'; } /* '' */
+.icon-resize-small:before { content: '\e804'; } /* '' */
+.icon-pause:before { content: '\e805'; } /* '' */
+.icon-play:before { content: '\e806'; } /* '' */
+.icon-forward:before { content: '\e807'; } /* '' */
+.icon-fast-bw:before { content: '\e808'; } /* '' */
