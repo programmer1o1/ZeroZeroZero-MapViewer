@@ -5082,7 +5082,8 @@ class ambient_generic extends BaseEntity {
     }
     
     private startsound(): void {
-        this.stopsound()
+        this.stopsound();
+        if (this.muted) return;
         this.source = this.audioContext.createBufferSource();
         this.source.playbackRate.value = this.pitch / 100 * this.audrate;
         this.source.buffer = this.audioBuffer;
@@ -5144,12 +5145,12 @@ class ambient_generic extends BaseEntity {
                     this.paused = true;
                 }
                 if (renderContext.globalDeltaTime > 0 && this.paused){
-                    if (!this.muted) this.startsound()
+                    this.startsound()
                     this.paused = false;
                 }
                 if (this.loop && this.audtime >= this.audioBuffer.duration){
                     this.audtime -= this.audioBuffer.duration
-                    if (!this.muted) this.startsound()
+                    this.startsound()
                 }
                 
             }
