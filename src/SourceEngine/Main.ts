@@ -1209,7 +1209,9 @@ export class SourceRenderContext {
     public globalTime: number = 0;
     public globalDeltaTime: number = 0;
     public globalTimeScale: number = 1;
+    public audioManager: AudioManager;
     public globalVolume: number = 1;
+    public isPlaying: boolean = false;
     public isMuted: boolean = true;
     public materialProxySystem = new MaterialProxySystem();
     public cheapWaterStartDistance = 0.0;
@@ -1259,6 +1261,8 @@ export class SourceRenderContext {
         this.materialCache = new MaterialCache(device, this.renderCache, this.filesystem);
         this.studioModelCache = new StudioModelCache(this, this.filesystem);
         this.colorCorrection = new SourceColorCorrection(device, this.renderCache);
+
+        this.audioManager = new AudioManager();
 
         if (!this.device.queryLimits().occlusionQueriesRecommended) {
             // Disable auto-exposure system on backends where we shouldn't use occlusion queries.
@@ -1891,6 +1895,8 @@ export class SourceRenderer implements SceneGfx {
 
         this.renderContext.currentView = null!;
 
+        this.renderContext.audioManager.movement(this.renderContext);
+
         ServerCommandLogger.tick();
     }
 
@@ -2073,6 +2079,7 @@ export class SourceRenderer implements SceneGfx {
         renderContext.globalDeltaTime = viewerInput.deltaTime / 1000.0;
         renderContext.globalTimeScale = viewerInput.timeScale;
         renderContext.globalVolume = viewerInput.volume;
+        renderContext.isPlaying = viewerInput.isPlaying;
         renderContext.isMuted = viewerInput.isMuted;
         renderContext.debugStatistics.reset();
 
@@ -2332,5 +2339,137 @@ export class SourceRenderer implements SceneGfx {
             this.skyboxRenderer.destroy(device);
         for (let i = 0; i < this.bspRenderers.length; i++)
             this.bspRenderers[i].destroy(device);
+    }
+}
+
+export class AudioManager {
+    private soundEvents:Array<SoundEvent>;
+    private paused: boolean;
+
+    constructor(){
+        this.soundEvents = [];
+    }
+
+    public createSoundEvent(renderContext:SourceRenderContext, message:string){
+        let e = new SoundEvent(renderContext, message);
+        this.soundEvents.push(e);
+        return e;
+    }
+
+    public onPause(){
+        this.paused = true;
+        for (let i = 0; i < this.soundEvents.length; i++){
+            let e = this.soundEvents[i];
+            e.stopSound();
+        }
+    }
+    
+    public onPlay(){
+        this.paused = false;
+        for (let i = 0; i < this.soundEvents.length; i++){
+            let e = this.soundEvents[i];
+            if (e.isStarted()) e.startSound();
+        }
+    }
+
+    public movement(renderContext:SourceRenderContext) {
+        if (renderContext.globalDeltaTime == 0 && !this.paused) this.onPause();
+        if (renderContext.globalDeltaTime > 0 && this.paused) this.onPlay();
+        for (let i = 0; i < this.soundEvents.length; i++){
+            let e = this.soundEvents[i];
+            e.movement();
+        }
+    }
+}
+
+export class SoundEvent {
+    private duration:number;
+    private currentTime:number;
+    private loop:boolean;
+    private volume:number;
+    private hasStarted:boolean;
+    private isPlaying:boolean;
+    private pitch:number;
+;
+    private audioContext:AudioContext;
+    private audioBuffer:AudioBuffer;
+    private sourceNode:AudioBufferSourceNode;
+    private gainNode:GainNode;
+
+    private renderContext:SourceRenderContext;
+    
+    constructor(renderContext: SourceRenderContext, message:string) {
+        this.renderContext = renderContext;
+        this.currentTime = 0;
+        this.fetchAudio(renderContext, message);
+    }
+
+    public isStarted() {
+        return this.hasStarted;
+    }
+
+    public resetSound() {
+        this.currentTime = 0;
+    }
+
+
+    public async fetchAudio(renderContext: SourceRenderContext, message:string) {
+        const audioData = await renderContext.filesystem.fetchFileData(`sound/${message}`);
+        if (audioData === null) {
+            console.log(`failed to load ${message}`);
+            return;
+        }
+
+        this.audioContext = new AudioContext();
+        this.gainNode = new GainNode(this.audioContext);
+        this.audioBuffer = await this.audioContext.decodeAudioData(audioData.copyToBuffer(), ()=>console.log(`loaded ${message}`));
+        this.duration = this.audioBuffer.duration;
+    }
+
+    public startSound() {
+        this.hasStarted = true;
+        this.isPlaying = true;
+
+        this.sourceNode?.stop();
+        this.sourceNode = this.audioContext.createBufferSource();
+        this.sourceNode.playbackRate.value = this.pitch;
+        this.sourceNode.buffer = this.audioBuffer;
+        this.sourceNode.connect(this.gainNode).connect(this.audioContext.destination);
+        if (this.currentTime >= 0) {
+            this.sourceNode.start(0, this.currentTime)
+        } else {
+            this.sourceNode.start(-this.currentTime, 0)
+        }
+    }
+
+    public stopSound() {
+        this.isPlaying = false;
+        this.sourceNode?.stop();
+    }
+
+    public movement() {
+        if (this.isPlaying) {
+            this.currentTime += this.renderContext.globalDeltaTime;
+            if (this.renderContext.isMuted){
+                this.gainNode.gain.value = 0;
+            } else {
+                this.gainNode.gain.value = this.renderContext.globalVolume*this.volume;
+            }
+            this.sourceNode.playbackRate.value = this.renderContext.globalTimeScale*this.pitch;
+        }
+        if(this.loop && this.currentTime >= this.duration){
+            this.currentTime -= this.duration;
+            this.startSound();
+        }
+    }
+    
+    public setLoop(shouldLoop:boolean){
+        this.loop = shouldLoop
+    }
+    public setVolume(volume:number) {
+        this.volume = volume/10;
+    }
+    public setPitch(pitch:number) {
+        this.pitch = pitch/100;
     }
 }

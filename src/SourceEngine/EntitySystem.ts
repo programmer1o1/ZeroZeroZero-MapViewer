@@ -13,7 +13,7 @@ import { GfxRenderInstManager, setSortKeyDepth } from '../gfx/render/GfxRenderIn
 import { clamp, computeModelMatrixR, computeModelMatrixSRT, getMatrixAxis, getMatrixAxisX, getMatrixAxisY, getMatrixAxisZ, getMatrixTranslation, invlerp, lerp, MathConstants, projectionMatrixForFrustum, randomRange, saturate, scaleMatrix, setMatrixTranslation, transformVec3Mat4w1, vec3SetAll, Vec3UnitX, Vec3UnitY, Vec3UnitZ, Vec3Zero } from '../MathHelpers.js';
 import { arrayRemove, assert, assertExists, fallbackUndefined, leftPad, nArray, nullify } from '../util.js';
 import { BSPEntity, DecalSurface } from './BSPFile.js';
-import { BSPModelRenderer, BSPRenderer, BSPSurfaceRenderer, ProjectedLightRenderer, RenderObjectKind, SourceEngineView, SourceEngineViewType, SourceRenderContext, SourceRenderer, SourceWorldViewRenderer } from './Main.js';
+import { BSPModelRenderer, BSPRenderer, BSPSurfaceRenderer, ProjectedLightRenderer, RenderObjectKind, SourceEngineView, SourceEngineViewType, SourceRenderContext, SourceRenderer, SourceWorldViewRenderer , SoundEvent } from './Main.js';
 import { ParticleControlPoint, ParticleSystemInstance } from './ParticleSystem.js';
 import { SpriteInstance } from './Sprite.js';
 import { computeMatrixForForwardDir } from './StaticDetailObject.js';
@@ -5005,15 +5005,6 @@ class ambient_generic extends BaseEntity {
     private isPlaying: boolean;
     private message:string;
     
-    private audioBuffer: AudioBuffer | null = null;
-    private audioContext: AudioContext;
-    private audtime: number = 0;
-    private audrate: number = 1;
-    private source: AudioBufferSourceNode;
-    private gain: GainNode;
-    private paused: boolean = true;
-    private muted: boolean = true;
-
     private volume: number = 10;
     private maxDistance: number = 10000;
     private pitch: number = 100;
@@ -5021,6 +5012,9 @@ class ambient_generic extends BaseEntity {
 
     private loop: boolean = false
     private playEverywhere: boolean = false
+    private startSilent:boolean = false
+
+    private sound;
 
     constructor(entitySystem: EntitySystem, renderContext: SourceRenderContext, bspRenderer: BSPRenderer, entity: BSPEntity) {
         super(entitySystem, renderContext, bspRenderer, entity);
@@ -5040,8 +5034,6 @@ class ambient_generic extends BaseEntity {
 
         this.sourceEntityName = fallbackUndefined(entity.sourceentityname, null)
 
-        this.fetchAudio(renderContext, entity.message);
-
         const enum SpawnFlags {
             PLAY_EVERYWHERE = 0x01,
             START_SILENT  = 0x10,
@@ -5052,56 +5044,36 @@ class ambient_generic extends BaseEntity {
         const spawnflags: SpawnFlags = Number(fallbackUndefined(this.entity.spawnflags, '0'));
         this.loop = spawnflags&SpawnFlags.IS_NOT_LOOPED ? false : true;
         this.playEverywhere = spawnflags&SpawnFlags.PLAY_EVERYWHERE ? true : false;
-        this.isPlaying = spawnflags&SpawnFlags.START_SILENT ? false : true;
-
-    }
-
-    private async fetchAudio(renderContext: SourceRenderContext, message:string){
-        const audioData = await renderContext.filesystem.fetchFileData(`sound/${message}`);
-        if (audioData === null) {
-            console.log(`failed to load ${message}`)
-            return;
-        }
-
-        this.audioContext = new AudioContext()
-        this.gain = new GainNode(this.audioContext);
-        this.audioBuffer = await this.audioContext.decodeAudioData(audioData.copyToBuffer(), ()=>console.log(`loaded ${message}`));
+        this.startSilent = spawnflags&SpawnFlags.START_SILENT ? true : false;
         
+        this.sound = renderContext.audioManager.createSoundEvent(renderContext, entity.message);
+        this.sound.setLoop(this.loop);
+        this.sound.setVolume(this.volume);
+        this.sound.setPitch(this.pitch);
+
+        if (!this.startSilent) {
+            this.input_playsound();
+        }
     }
-    
+
     private input_pitch(entitySystem: EntitySystem, activator: BaseEntity, value: string): void {
-        const pitch = parseInt(value);
-        console.warn(`ambient_generic input_pitch notimplemented`)
+        this.pitch = parseInt(value);
+        this.sound.setPitch(this.pitch);
     }
     
     private input_playsound(): void {
-        this.audtime = 0
+        this.sound.resetSound();
+        this.sound.startSound();
         this.isPlaying = true;
-        if (!this.paused) this.startsound()
-        console.log(`play ${this.message}`);
     }
-    
-    private startsound(): void {
-        this.stopsound();
-        if (this.muted) return;
-        this.source = this.audioContext.createBufferSource();
-        this.source.playbackRate.value = this.pitch / 100 * this.audrate;
-        this.source.buffer = this.audioBuffer;
-        this.source.connect(this.gain).connect(this.audioContext.destination);
-        this.source.start(0, this.audtime)
-    }
-    private stopsound(): void {
-        if (this.source) {
-            this.source.stop()
-        }
-    }
+
     private getDistanceToPlayer(entitySystem: EntitySystem): number {
         const player = entitySystem.getLocalPlayer()
         const playerPos = vec3.create()
         const thisPos = vec3.create()
         player.getAbsOrigin(playerPos)
 
-        if (this.sourceEntityName){
+        if (this.sourceEntityName){ // Use the named entity as the source position, not this entity
             const sourceEntity = entitySystem.findEntityByTargetName(this.sourceEntityName);
             if (sourceEntity) {
                 sourceEntity.getAbsOrigin(thisPos)
@@ -5116,66 +5088,37 @@ class ambient_generic extends BaseEntity {
 
     public override movement(entitySystem: EntitySystem, renderContext: SourceRenderContext): void {
         super.movement(entitySystem, renderContext);
-        if (this.audioBuffer !== null) {
-            if (this.isPlaying) {
-                this.audrate = renderContext.globalTimeScale;
-                this.audtime += renderContext.globalDeltaTime;
-                
-                if (this.playEverywhere){
-                    this.gain.gain.value = renderContext.globalVolume * this.volume / 10;
-                } else {
-                    const dist = this.getDistanceToPlayer(entitySystem)
-                    const distVol = clamp((this.maxDistance - dist) / this.maxDistance,0,1)
-                    this.gain.gain.value = renderContext.globalVolume * distVol * this.volume / 10;
-                }
-
-                if (renderContext.isMuted && !this.muted){
-                    this.muted = true
-                    if (!this.paused) this.stopsound();
-                }
-                if (!renderContext.isMuted && this.muted){
-                    this.muted = false
-                    if (!this.paused) this.startsound();
-                }
-
-                if (this.audtime < 0) this.audtime = 0;
-                
-                if (renderContext.globalDeltaTime == 0 && !this.paused){
-                    if (this.source) this.source.stop()
-                    this.paused = true;
-                }
-                if (renderContext.globalDeltaTime > 0 && this.paused){
-                    this.startsound()
-                    this.paused = false;
-                }
-                if (this.loop && this.audtime >= this.audioBuffer.duration){
-                    this.audtime -= this.audioBuffer.duration
-                    this.startsound()
-                }
-                
-            }
+        if (!this.playEverywhere){
+            const dist = this.getDistanceToPlayer(entitySystem);
+            const distVol = clamp((this.maxDistance - dist) / this.maxDistance,0,1); // probably should be inverse square law
+            this.sound.setVolume(distVol*this.volume);
         }
+        // this.sound.movement()
     }
     
     private input_stopsound(): void {
+        this.sound.stopSound();
         this.isPlaying = false;
-        if (this.source) {
-            this.source.stop();
-            this.paused = true;
-        }
     }
 
     public override destroy(device: GfxDevice): void {
         super.destroy(device);
-        this.stopsound()
+        this.sound.stopSound()
     }
 
     private input_togglesound(): void {
         this.isPlaying = !this.isPlaying;
+        if(this.isPlaying){
+            this.sound.startSound();
+        }else {
+            this.sound.stopSound();
+        }
     }
 
     private input_volume(entitySystem: EntitySystem, activator: BaseEntity, value: string): void {
-        console.warn(`ambient_generic input_volume notimplemented`)
+        // console.warn(`ambient_generic input_volume notimplemented`)
+        let vol = parseInt(value)
+        this.sound.setVolume(vol)
     }
     private input_fadein(): void {
         console.warn(`ambient_generic input_fadein notimplemented`)

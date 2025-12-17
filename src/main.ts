@@ -253,6 +253,7 @@ class Main {
             return;
 
         this.isPlaying = v;
+        this.viewer.setIsPlaying(v);
         this.ui.playPauseButton.setIsPlaying(v);
 
         if (IS_DEVELOPMENT)

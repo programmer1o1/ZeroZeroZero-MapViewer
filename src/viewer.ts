@@ -42,6 +42,7 @@ export interface ViewerRenderInput {
     deltaTime: number;
     timeScale: number;
     volume: number;
+    isPlaying: boolean;
     isMuted: boolean;
     backbufferWidth: number;
     backbufferHeight: number;
@@ -99,6 +100,7 @@ export class Viewer {
     public sceneTimeScale: number = 1;
     public externalControl: boolean = false;
 
+    public isPlaying: boolean = false;
     public isMuted: boolean = true;
     public volume: number = 1;
 
@@ -125,6 +127,7 @@ export class Viewer {
             time: this.sceneTime,
             timeScale: this.sceneTimeScale,
             volume: this.volume,
+            isPlaying: this.isPlaying,
             isMuted: this.isMuted,
             deltaTime: 0,
             backbufferWidth: 0,
@@ -160,6 +163,12 @@ export class Viewer {
     private renderViewport(): void {
         if (this.scene !== null)
             this.scene.render(this.gfxDevice, this.viewerRenderInput);
+    }
+
+    public setIsPlaying(v:boolean): void {
+        if (this.isPlaying === v) return;
+        this.isPlaying = v
+        this.viewerRenderInput.isPlaying = v;
     }
 
     public setIsMuted(v:boolean): void {
