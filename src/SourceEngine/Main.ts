@@ -2401,6 +2401,8 @@ export class SoundEvent {
     constructor(renderContext: SourceRenderContext, message:string) {
         this.renderContext = renderContext;
         this.currentTime = 0;
+        this.audioContext = new AudioContext();
+        this.gainNode = new GainNode(this.audioContext);
         this.fetchAudio(renderContext, message);
     }
 
@@ -2420,8 +2422,6 @@ export class SoundEvent {
             return;
         }
 
-        this.audioContext = new AudioContext();
-        this.gainNode = new GainNode(this.audioContext);
         this.audioBuffer = await this.audioContext.decodeAudioData(audioData.copyToBuffer(), ()=>console.log(`loaded ${message}`));
         this.duration = this.audioBuffer.duration;
     }
