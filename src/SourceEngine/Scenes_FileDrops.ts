@@ -10,7 +10,7 @@ export async function createKitchenSinkSourceFilesytem(dataFetcher: DataFetcher)
     const filesystem = new SourceFileSystem(dataFetcher);
     // Mount all the things!
     await Promise.all([
-        filesystem.createVPKMount(`CounterStrikeSource/cstrike_pak`),
+        filesystem.createVPKMount(`paks/cstrike/cstrike_pak`),
         filesystem.createVPKMount(`TeamFortress2/tf/tf2_textures`),
         filesystem.createVPKMount(`TeamFortress2/tf/tf2_misc`),
         filesystem.createVPKMount(`Portal2/portal2/pak01`),

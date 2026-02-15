@@ -171,6 +171,7 @@ class ShaderTemplates {
 export class MaterialCache {
     private textureCache = new Map<string, VTF>();
     private texturePromiseCache = new Map<string, Promise<VTF>>();
+    private missingTextureNames = new Set<string>();
     private materialPromiseCache = new Map<string, Promise<VMT>>();
     private usingHDR: boolean = false;
     public readonly particleSystemCache: ParticleSystemCache;
@@ -282,11 +283,19 @@ export class MaterialCache {
     }
 
     public async createMaterialInstance(path: string): Promise<BaseMaterial> {
-        const vmt = await this.fetchMaterialData(path);
-        const materialInstance = this.createMaterialInstanceInternal(vmt);
-        if (vmt['%compiletrigger'])
-            materialInstance.isToolMaterial = true;
-        return materialInstance;
+        try {
+            const vmt = await this.fetchMaterialData(path);
+            const materialInstance = this.createMaterialInstanceInternal(vmt);
+            if (vmt['%compiletrigger'])
+                materialInstance.isToolMaterial = true;
+            return materialInstance;
+        } catch (e) {
+            const errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+            const wrapped = new Error(`Material create failed for "${path}": ${errorMessage}`);
+            if (e instanceof Error && e.stack)
+                wrapped.stack = `${wrapped.stack}\nCaused by: ${e.stack}`;
+            throw wrapped;
+        }
     }
 
     public checkVTFExists(name: string): boolean {
@@ -297,6 +306,10 @@ export class MaterialCache {
     private async fetchVTFInternal(name: string, srgb: boolean, cacheKey: string): Promise<VTF> {
         const path = this.filesystem.resolvePath(this.resolvePath(name), '.vtf');
         const data = await this.filesystem.fetchFileData(path);
+        if (data === null && !this.missingTextureNames.has(path)) {
+            this.missingTextureNames.add(path);
+            console.error(`Missing VTF texture "${name}" (resolved to "${path}").`);
+        }
         const vtf = new VTF(this.device, this.cache, data, path, srgb);
         this.textureCache.set(cacheKey, vtf);
         return vtf;

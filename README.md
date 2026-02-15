@@ -6,14 +6,14 @@ The reverse engineering of model formats was done by many people. See the applic
 
 # INTERLOPER FORK
 
-This is a fork of the noclip.website intended for maps related to the Interloper ARG by Anomidae.<br>
+This is a fork of the noclip.website intended for maps related to the zerozerozero project.<br>
 Created by qbyte. Modified by programmer1o1. Almost all things should work.
 
 ## Contributing
 
 [Official noclip.website Github](https://github.com/magcius/noclip.website)<br>
 [Official noclip.website Discord Server](https://discord.gg/bkJmKKv)<br>
-[Official Interloper Discord Server](https://discord.gg/H4X9GxZw)
+[Official zerozerozero Discord Server](https://discord.com/invite/fXc9R3GuHR)
 
 ## Compile Guide
 
@@ -56,8 +56,8 @@ This project is a fork of [noclip.website](https://github.com/magcius/noclip.web
 6. Clone the repository and enter the directory:
 
     ```sh
-    git clone https://github.com/programmer1o1/CGE7-193MapViewer.git
-    cd CGE7-193MapViewer
+    git clone https://github.com/programmer1o1/ZeroZeroZero-MapViewer.git
+    cd ZeroZeroZero-MapViewer
     ```
 
 7. Build the Rust code (WebAssembly component):
@@ -124,8 +124,8 @@ This project is a fork of [noclip.website](https://github.com/magcius/noclip.web
 6. Clone the repository and navigate into it:
 
     ```sh
-    git clone hhttps://github.com/programmer1o1/CGE7-193MapViewer.git
-    cd CGE7-193MapViewer
+    git clone https://github.com/programmer1o1/ZeroZeroZero-MapViewer.git
+    cd ZeroZeroZero-MapViewer
     ```
 
 7. Build the Rust WASM code:

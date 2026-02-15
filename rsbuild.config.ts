@@ -67,12 +67,55 @@ export default defineConfig({
   dev: {
     setupMiddlewares: [
       (middlewares, _server) => {
+        middlewares.unshift(serveCrowmonitorProxy);
         middlewares.unshift(serveData);
         return middlewares;
       },
     ],
   },
 });
+
+const serveCrowmonitorProxy: RequestHandler = async (req, res, next) => {
+  const pathname = parseUrl(req)?.pathname;
+  if (!pathname || !pathname.startsWith('/crowmonitor/')) {
+    next();
+    return;
+  }
+
+  const targetPath = pathname.replace('/crowmonitor/', '');
+  const targetUrl = `https://static.crowmonitor.com/${targetPath}`;
+  try {
+    const headers: Record<string, string> = {};
+    if (req.headers.range)
+      headers['range'] = Array.isArray(req.headers.range) ? req.headers.range[0] : req.headers.range;
+
+    const upstream = await fetch(targetUrl, { headers });
+    res.statusCode = upstream.status;
+    upstream.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+
+    if (upstream.body) {
+      const reader = upstream.body.getReader();
+      const pump = async (): Promise<void> => {
+        const { done, value } = await reader.read();
+        if (done) {
+          res.end();
+          return;
+        }
+        res.write(Buffer.from(value));
+        await pump();
+      };
+      await pump();
+    } else {
+      res.end();
+    }
+  } catch (err) {
+    console.error('Crowmonitor proxy error:', err);
+    res.statusCode = 502;
+    res.end('Bad Gateway');
+  }
+};
 
 // Serve files from the `data` directory.
 const serveData: RequestHandler = (req, res, next) => {

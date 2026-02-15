@@ -36,6 +36,9 @@ export class TeamFortress2SceneDesc implements SceneDesc {
                 `${pakfilesPathBase}/tf2/tf2_misc`,
                 `${pakfilesPathBase}/hl2/hl2_textures`,
                 `${pakfilesPathBase}/hl2/hl2_misc`,
+                `${pakfilesPathBase}/cstrike/cstrike_pak`,
+                `${pakfilesPathBase}/tf2/plaza_materials`,
+                `${pakfilesPathBase}/tf2/xmastextures`,
             ];
             
             // optional: sounds can load in background
@@ -57,7 +60,7 @@ export class TeamFortress2SceneDesc implements SceneDesc {
 }
 
 export class CGESceneDesc implements SceneDesc {
-    constructor(public id: string, public name: string = id) {
+    constructor(public id: string, public name: string = id, private mapPath: string | null = null) {
     }
 
     public async createScene(device: GfxDevice, context: SceneContext) {
@@ -69,6 +72,8 @@ export class CGESceneDesc implements SceneDesc {
                 `${pakfilesPathBase}/tf2/tf2_misc`,
                 `${pakfilesPathBase}/hl2/hl2_textures`,
                 `${pakfilesPathBase}/hl2/hl2_misc`,
+                `${pakfilesPathBase}/tf2/plaza_materials`,
+                `${pakfilesPathBase}/tf2/xmastextures`,
             ];
             
             const optional = [
@@ -82,8 +87,15 @@ export class CGESceneDesc implements SceneDesc {
             return filesystem;
         });
 
+        // ensure CS:S textures are available even if the filesystem was cached earlier.
+        await filesystem.toggleVPKMount(`${pakfilesPathBase}/cstrike/cstrike_pak`, true);
+        // force-load plaza/xmas VPKs even if the filesystem was cached earlier.
+        await filesystem.toggleVPKMount(`${pakfilesPathBase}/tf2/plaza_materials`, true);
+        await filesystem.toggleVPKMount(`${pakfilesPathBase}/tf2/xmastextures`, true);
+
         const loadContext = new SourceLoadContext(filesystem);
-        return createScene(context, loadContext, this.id, `maps/${this.id}/${this.id}.bsp`);
+        const mapPath = this.mapPath ?? `maps/${this.id}/${this.id}.bsp`;
+        return createScene(context, loadContext, this.id, mapPath);
     }
 }
 

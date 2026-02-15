@@ -390,13 +390,23 @@ export abstract class BaseMaterial {
     }
 
     public async init(renderContext: SourceRenderContext) {
-        this.setupParametersFromVMT(renderContext);
-        if (this.vmt.proxies !== undefined)
-            this.proxyDriver = renderContext.materialProxySystem.createProxyDriver(this, this.vmt.proxies);
+        try {
+            this.setupParametersFromVMT(renderContext);
+            if (this.vmt.proxies !== undefined)
+                this.proxyDriver = renderContext.materialProxySystem.createProxyDriver(this, this.vmt.proxies);
 
-        this.initStaticBeforeResourceFetch();
-        await this.fetchResources(renderContext.materialCache);
-        this.initStatic(renderContext.materialCache);
+            this.initStaticBeforeResourceFetch();
+            await this.fetchResources(renderContext.materialCache);
+            this.initStatic(renderContext.materialCache);
+        } catch (e) {
+            const errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+            const wrapped = new Error(
+                `Material init failed for "${this.vmt._Filename}" (shader="${this.vmt._Root}"): ${errorMessage}`
+            );
+            if (e instanceof Error && e.stack)
+                wrapped.stack = `${wrapped.stack}\nCaused by: ${e.stack}`;
+            throw wrapped;
+        }
     }
 
     public isMaterialLoaded(): boolean {
@@ -657,7 +667,7 @@ export abstract class BaseMaterial {
             megaStateFlags.depthWrite = true;
             this.isTranslucent = false;
         } else {
-            throw "whoops";
+            throw new Error(`Unknown alpha blend mode: ${alphaBlendMode}`);
         }
     }
 

@@ -12,7 +12,13 @@ const enum ImageFormat {
     ABGR8888      = 0x01,
     RGB888        = 0x02,
     BGR888        = 0x03,
+    RGB565        = 0x04,
     I8            = 0x05,
+    IA88          = 0x06,
+    P8            = 0x07,
+    A8            = 0x08,
+    RGB888_BLUESCREEN = 0x09,
+    BGR888_BLUESCREEN = 0x0A,
     ARGB8888      = 0x0B,
     BGRA8888      = 0x0C,
     DXT1          = 0x0D,
@@ -52,13 +58,23 @@ function imageFormatGetBPP(fmt: ImageFormat): number {
         return 3;
     if (fmt === ImageFormat.BGR888)
         return 3;
+    if (fmt === ImageFormat.RGB565)
+        return 2;
     if (fmt === ImageFormat.BGRA5551)
         return 2;
     if (fmt === ImageFormat.UV88)
         return 2;
     if (fmt === ImageFormat.I8)
         return 1;
-    throw "whoops";
+    if (fmt === ImageFormat.A8)
+        return 1;
+    if (fmt === ImageFormat.IA88)
+        return 2;
+    if (fmt === ImageFormat.RGB888_BLUESCREEN)
+        return 3;
+    if (fmt === ImageFormat.BGR888_BLUESCREEN)
+        return 3;
+    throw new Error(`Unknown VTF image format (BPP) ${fmt}`);
 }
 
 function imageFormatCalcLevelSize(fmt: ImageFormat, width: number, height: number, depth: number): number {
@@ -73,7 +89,7 @@ function imageFormatCalcLevelSize(fmt: ImageFormat, width: number, height: numbe
         else if (fmt === ImageFormat.DXT5)
             return count * 16;
         else
-            throw "whoops";
+            throw new Error(`Unknown block-compressed VTF image format ${fmt}`);
     } else {
         return (width * height * depth) * imageFormatGetBPP(fmt);
     }
@@ -99,45 +115,79 @@ function imageFormatToGfxFormat(device: GfxDevice, fmt: ImageFormat, srgb: boole
         return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
     else if (fmt === ImageFormat.BGRX8888)
         return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
+    else if (fmt === ImageFormat.RGB565)
+        return GfxFormat.U16_RGB_565;
     else if (fmt === ImageFormat.BGRA5551)
         return GfxFormat.U16_RGBA_5551; // TODO(jstpierre): sRGB?
     else if (fmt === ImageFormat.UV88)
         return GfxFormat.S8_RG_NORM;
     else if (fmt === ImageFormat.I8)
         return GfxFormat.U8_RGBA_NORM;
+    else if (fmt === ImageFormat.A8)
+        return GfxFormat.U8_RGBA_NORM;
+    else if (fmt === ImageFormat.IA88)
+        return GfxFormat.U8_RGBA_NORM;
+    else if (fmt === ImageFormat.RGB888_BLUESCREEN)
+        return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
+    else if (fmt === ImageFormat.BGR888_BLUESCREEN)
+        return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
     else if (fmt === ImageFormat.RGBA16161616F)
         return GfxFormat.F16_RGBA;
     else
-        throw "whoops";
+        throw new Error(`Unsupported VTF image format ${fmt}`);
 }
 
 function imageFormatConvertData(device: GfxDevice, fmt: ImageFormat, data: ArrayBufferSlice, width: number, height: number, depth: number): ArrayBufferView {
-    if (fmt === ImageFormat.BGR888) {
+    if (fmt === ImageFormat.BGR888 || fmt === ImageFormat.BGR888_BLUESCREEN) {
         // BGR888 => RGBA8888
         const src = data.createDataView();
         const n = width * height * depth * 4;
         const dst = new Uint8Array(n);
         let p = 0;
         for (let i = 0; i < n;) {
-            dst[i++] = src.getUint8(p + 2);
-            dst[i++] = src.getUint8(p + 1);
-            dst[i++] = src.getUint8(p + 0);
-            dst[i++] = 255;
+            const b = src.getUint8(p + 0);
+            const g = src.getUint8(p + 1);
+            const r = src.getUint8(p + 2);
+            dst[i++] = r;
+            dst[i++] = g;
+            dst[i++] = b;
+            dst[i++] = (fmt === ImageFormat.BGR888_BLUESCREEN && r === 0 && g === 0 && b === 255) ? 0 : 255;
             p += 3;
         }
         return dst;
-    } else if (fmt === ImageFormat.RGB888) {
+    } else if (fmt === ImageFormat.RGB888 || fmt === ImageFormat.RGB888_BLUESCREEN) {
         // RGB888 => RGBA8888
         const src = data.createDataView();
         const n = width * height * depth * 4;
         const dst = new Uint8Array(n);
         let p = 0;
         for (let i = 0; i < n;) {
-            dst[i++] = src.getUint8(p + 0);
-            dst[i++] = src.getUint8(p + 1);
-            dst[i++] = src.getUint8(p + 2);
-            dst[i++] = 255;
+            const r = src.getUint8(p + 0);
+            const g = src.getUint8(p + 1);
+            const b = src.getUint8(p + 2);
+            dst[i++] = r;
+            dst[i++] = g;
+            dst[i++] = b;
+            dst[i++] = (fmt === ImageFormat.RGB888_BLUESCREEN && r === 0 && g === 0 && b === 255) ? 0 : 255;
             p += 3;
+        }
+        return dst;
+    } else if (fmt === ImageFormat.RGB565) {
+        // RGB565 => RGBA8888
+        const src = data.createDataView();
+        const n = width * height * depth * 4;
+        const dst = new Uint8Array(n);
+        let p = 0;
+        for (let i = 0; i < n;) {
+            const v = src.getUint16(p, true);
+            const r = (v >> 11) & 0x1f;
+            const g = (v >> 5) & 0x3f;
+            const b = v & 0x1f;
+            dst[i++] = (r << 3) | (r >> 2);
+            dst[i++] = (g << 2) | (g >> 4);
+            dst[i++] = (b << 3) | (b >> 2);
+            dst[i++] = 255;
+            p += 2;
         }
         return dst;
     } else if (fmt === ImageFormat.ABGR8888) {
@@ -186,6 +236,37 @@ function imageFormatConvertData(device: GfxDevice, fmt: ImageFormat, data: Array
         return data.createTypedArray(Int8Array);
     } else if (fmt === ImageFormat.BGRA5551 || fmt === ImageFormat.RGBA16161616F) {
         return data.createTypedArray(Uint16Array);
+    } else if (fmt === ImageFormat.A8) {
+        // A8 => RGBA8888 (alpha only)
+        const src = data.createDataView();
+        const n = width * height * depth * 4;
+        const dst = new Uint8Array(n);
+        let p = 0;
+        for (let i = 0; i < n;) {
+            const a = src.getUint8(p + 0);
+            dst[i++] = 255;
+            dst[i++] = 255;
+            dst[i++] = 255;
+            dst[i++] = a;
+            p += 1;
+        }
+        return dst;
+    } else if (fmt === ImageFormat.IA88) {
+        // IA88 => RGBA8888 (intensity + alpha)
+        const src = data.createDataView();
+        const n = width * height * depth * 4;
+        const dst = new Uint8Array(n);
+        let p = 0;
+        for (let i = 0; i < n;) {
+            const l = src.getUint8(p + 0);
+            const a = src.getUint8(p + 1);
+            dst[i++] = l;
+            dst[i++] = l;
+            dst[i++] = l;
+            dst[i++] = a;
+            p += 2;
+        }
+        return dst;
     } else if (fmt === ImageFormat.I8) {
         // I8 => RGBA8888
         const src = data.createDataView();
@@ -321,7 +402,7 @@ export class VTF {
                 imageDataIdx = dataIdx;
             }
         } else {
-            throw "whoops";
+            throw new Error(`Unsupported VTF version ${this.versionMajor}.${this.versionMinor}`);
         }
 
         const isCube = !!(this.flags & VTFFlags.ENVMAP);

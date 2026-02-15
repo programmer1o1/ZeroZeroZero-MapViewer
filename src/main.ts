@@ -4,8 +4,6 @@
 import { Viewer, SceneGfx, InitErrorCode, initializeViewer, makeErrorUI, resizeCanvas, ViewerUpdateInfo } from './viewer.js';
 
 import * as Scenes_CGE from './SourceEngine/Scenes_CGE.js';
-import * as Scenes_InitialManifest from './SourceEngine/Scenes_InitialManifest.js';
-import * as Scenes_TuesdayManifest from './SourceEngine/Scenes_TuesdayManifest.js';
 import { DroppedFileSceneDesc, traverseFileSystemDataTransfer } from './Scenes_FileDrops.js';
 
 import { UI, Panel } from './ui.js';
@@ -30,9 +28,6 @@ import { debugJunk } from './DebugJunk.js';
 import { IS_DEVELOPMENT } from './BuildVersion.js';
 
 const sceneGroups: (string | SceneGroup)[] = [
-    "Interloper",
-    Scenes_InitialManifest.sceneGroup,
-    Scenes_TuesdayManifest.sceneGroup,
     Scenes_CGE.sceneGroup,
 ];
 
@@ -740,6 +735,7 @@ class Main {
         };
         this._syncWebXRSettingsVisible();
     }
+
 
     private _syncWebXRSettingsVisible(): void {
         this.ui.xrSettings.setVisible(this.webXRContext.isSupported);

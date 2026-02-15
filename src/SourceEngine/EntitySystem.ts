@@ -4180,6 +4180,10 @@ export class game_text extends BaseEntity {
     }
 }
 
+export class game_text_tf extends game_text {
+    public static override classname = `game_text_tf`;
+}
+
 // we are not really in the game but would be nice to implement
 export class ServerCommandLogger {
     private static element: HTMLDivElement | null = null;
@@ -5505,6 +5509,7 @@ export class EntityFactoryRegistry {
         this.registerFactory(env_tonemap_controller);
         this.registerFactory(env_projectedtexture);
         this.registerFactory(point_servercommand);
+        this.registerFactory(game_text_tf);
         this.registerFactory(game_text);
         this.registerFactory(env_shake);
         this.registerFactory(fog_volume);

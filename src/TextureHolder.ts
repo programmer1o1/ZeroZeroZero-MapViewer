@@ -75,6 +75,7 @@ export abstract class TextureHolder<TextureType extends TextureBase> {
     public textureEntries: TextureType[] = [];
     public textureOverrides = new Map<string, TextureOverride>();
     public onnewtextures: (() => void) | null = null;
+    private missingTextureNames = new Set<string>();
 
     public destroy(device: GfxDevice): void {
         this.gfxTextures.forEach((texture) => device.destroyTexture(texture));
@@ -122,7 +123,10 @@ export abstract class TextureHolder<TextureType extends TextureBase> {
             return true;
         }
 
-        // throw new Error(`Cannot find texture ${name}`);
+        if (!this.missingTextureNames.has(name)) {
+            this.missingTextureNames.add(name);
+            console.error(`Missing texture "${name}" requested; rendering will show missing textures.`);
+        }
         return false;
     }
 
@@ -153,8 +157,10 @@ export abstract class TextureHolder<TextureType extends TextureBase> {
                 index = this.textureEntries.length;
 
             const loadedTexture = this.loadTexture(device, texture);
-            if (loadedTexture === null)
+            if (loadedTexture === null) {
+                console.error(`Failed to load texture "${texture.name}". This will render as missing textures.`);
                 continue;
+            }
 
             const { gfxTexture, viewerTexture } = loadedTexture;
             this.textureEntries[index] = texture;

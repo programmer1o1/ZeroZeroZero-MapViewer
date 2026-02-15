@@ -57,7 +57,7 @@ export class ValveKeyValueParser {
                 this.pos = this.S.indexOf('*/', this.pos) + 2;
                 return true;
             } else {
-                throw "whoops";
+                throw this.makeError(`Unexpected token after "/": "${ch}"`);
             }
         }
         else if (tok === '#') {
@@ -111,8 +111,7 @@ export class ValveKeyValueParser {
             else
                 val += tok;
         }
-        debugger;
-        throw "whoops";
+        throw this.makeError(`Unterminated quoted string`);
     }
 
     private run(t: RegExp, start: string): string {
@@ -153,9 +152,7 @@ export class ValveKeyValueParser {
             return this.unquote(tok);
         else if (/[-0-9.]/.test(tok))
             return this.num(tok);
-        console.log(tok);
-        debugger;
-        throw "whoops";
+        throw this.makeError(`Unexpected token "${tok}"`);
     }
 
     public pair<T extends VKFPairUnit>(): VKFPair<T> {
@@ -164,6 +161,13 @@ export class ValveKeyValueParser {
         const k = (kk as string).toLowerCase();
         const v = this.unit() as T;
         return [k, v];
+    }
+
+    private makeError(message: string): Error {
+        const start = Math.max(0, this.pos - 20);
+        const end = Math.min(this.S.length, this.pos + 20);
+        const snippet = this.S.slice(start, end).replace(/\n/g, '\\n');
+        return new Error(`${message} at pos=${this.pos}. Context="${snippet}"`);
     }
 }
 
@@ -217,17 +221,26 @@ function stealPair(pairs: VKFPair[], name: string): VKFPair | null {
     return pair;
 }
 
+const missingVmtNames = new Set<string>();
+
 export async function parseVMT(filesystem: SourceFileSystem, path: string, depth: number = 0): Promise<VMT> {
     async function parsePath(path: string): Promise<VMT> {
+        const requestedPath = path;
         path = filesystem.resolvePath(path, '.vmt');
+        const resolvedPath = path;
         if (!filesystem.hasEntry(path)) {
             // Amazingly, the material could be in materials/materials/, like is
             //    materials/materials/nature/2/blenddirttojunglegrass002b.vmt
             // from cp_mossrock
             path = `materials/${path}`;
         }
-        if (!filesystem.hasEntry(path))
+        if (!filesystem.hasEntry(path)) {
+            if (!missingVmtNames.has(resolvedPath)) {
+                missingVmtNames.add(resolvedPath);
+                console.error(`Missing VMT material "${requestedPath}" (resolved to "${resolvedPath}").`);
+            }
             path = `materials/debug/debugempty.vmt`;
+        }
         const buffer = assertExists(await filesystem.fetchFileData(path));
         const str = new TextDecoder('utf8').decode(buffer.createTypedArray(Uint8Array));
 

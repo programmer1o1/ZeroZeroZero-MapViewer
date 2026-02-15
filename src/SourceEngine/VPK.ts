@@ -34,13 +34,13 @@ export function parseVPKDirectory(buffer: ArrayBufferSlice): VPKDirectory {
         idx = 0x0C;
     } else if (version === 0x02) {
         const embeddedChunkSize = view.getUint32(0x0C, true);
-        assert(embeddedChunkSize === 0);
+        assert(embeddedChunkSize === 0, `Unexpected embedded chunk size: ${embeddedChunkSize}`);
         const chunkHashesSize = view.getUint32(0x10, true);
         const selfHashesSize = view.getUint32(0x14, true);
         const signatureSize = view.getUint32(0x18, true);
         idx = 0x1C;
     } else {
-        throw "whoops";
+        throw new Error(`Unsupported VPK version ${version}`);
     }
 
     // Parse directory.
@@ -173,6 +173,11 @@ export class VPKMount {
 }
 
 export async function createVPKMount(dataFetcher: DataFetcher, basePath: string) {
-    const dir = parseVPKDirectory(await dataFetcher.fetchData(`${basePath}_dir.vpk`));
-    return new VPKMount(basePath, dir);
+    try {
+        const dir = parseVPKDirectory(await dataFetcher.fetchData(`${basePath}_dir.vpk`));
+        return new VPKMount(basePath, dir);
+    } catch (e) {
+        const errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        throw new Error(`VPK mount failed for "${basePath}_dir.vpk": ${errorMessage}`);
+    }
 }

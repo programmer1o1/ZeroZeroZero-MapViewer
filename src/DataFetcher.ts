@@ -22,10 +22,25 @@ function getDataStorageBaseURL(isDevelopment: boolean): string {
 
 function getDataURLForPath(url: string, isDevelopment: boolean): string {
     if (url.startsWith('https://') || url.startsWith('http://'))
-        return url;
+        return rewriteCrowmonitorForLocalhost(url);
 
     assert(!url.startsWith(`data/`));
     return `${getDataStorageBaseURL(isDevelopment)}/${url}`;
+}
+
+function rewriteCrowmonitorForLocalhost(url: string): string {
+    try {
+        const loc = window.location;
+        if (loc.hostname !== 'localhost' && loc.hostname !== '127.0.0.1')
+            return url;
+    } catch {
+        return url;
+    }
+
+    if (!url.startsWith('https://static.crowmonitor.com/'))
+        return url;
+
+    return url.replace('https://static.crowmonitor.com/', '/crowmonitor/');
 }
 
 export type AbortedCallback = () => void;
@@ -276,6 +291,7 @@ class DataFetcherMount {
     }
 }
 
+
 declare global {
     interface Window {
         showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
@@ -324,20 +340,7 @@ export class DataFetcher {
     }
 
     public async mount() {
-        // mount functionality commented out since we're using remote tf2 resources
-        // keeping it here in case someone wants to re-enable local file mounting
-        
-        // let directory: FileSystemDirectoryHandle;
-        // try {
-        //     directory = await window.showDirectoryPicker();
-        // } catch(e) {
-        //     // AbortError, likely.
-        //     return;
-        // }
-        // const mount = new DataFetcherMount(directory);
-        // this.mounts.push(mount);
-        
-        console.log('local mounting disabled - using tf2 remote resources');
+        console.log('local mounting disabled');
     }
 
     private manageCache(): void {
@@ -438,14 +441,6 @@ export class DataFetcher {
     }
 
     public async fetchData(path: string, options: DataFetcherOptions = {}): Promise<NamedArrayBufferSlice> {
-        // skip local mount checking since we're using remote resources
-        // for (let i = 0; i < this.mounts.length; i++) {
-        //     const mount = this.mounts[i];
-        //     const fileData = await mount.fetchData(path, options);
-        //     if (fileData !== null)
-        //         return fileData;
-        // }
-
         const url = this.getDataURLForPath(path);
         return await this.fetchURL(url, options);
     }

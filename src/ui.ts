@@ -19,9 +19,9 @@ import { SceneDesc, SceneGroup } from './SceneBase.js';
 import logoURL from './assets/logo.png';
 import { AntialiasingMode } from './gfx/helpers/RenderGraphHelpers.js';
 
-export const HIGHLIGHT_COLOR = 'rgba(0, 255, 0, 1)';
-export const COOL_PINK_COLOR = 'rgba(215, 20, 143, 1)';
-export const PANEL_BG_COLOR = 'rgb(0, 15, 0)';
+export const HIGHLIGHT_COLOR = 'rgba(180, 180, 180, 1)';
+export const COOL_PINK_COLOR = 'rgba(120, 120, 120, 1)';
+export const PANEL_BG_COLOR = 'rgb(24, 24, 24)';
 
 export function createDOMFromString(s: string): DocumentFragment {
     return document.createRange().createContextualFragment(s);
@@ -2088,8 +2088,8 @@ class About extends Panel {
 }
 </style>
 
-<h1> <img src="${logoURL}"> <span> Interloper Viewer </span> </h1>
-<h2> A digital viewer for Interloper Maps </h2>
+<h1> <img src="${logoURL}"> <span> zerozerozero </span> </h1>
+<h2> A digital viewer for zerozerozero Maps </h2>
 
 <a href="#" class="FAQLink"> What is this? / FAQ </a>
 
@@ -2097,15 +2097,15 @@ class About extends Panel {
 <p> Hold <strong>SHIFT</strong> to go faster, and use <strong>MOUSE WHEEL</strong> to fine tune the speed
 <strong>Z</strong> toggles the UI. </p>
 
-<p><a href="https://discord.gg/H4X9GxZw"><strong>JOIN THE INTERLOPER DISCORD</strong></a><br>
+<p><a href="https://discord.com/invite/fXc9R3GuHR"><strong>JOIN THE ZEROZEROZERO DISCORD</strong></a><br>
 <a href="https://discord.gg/bkJmKKv"><strong>JOIN THE NOCLIP DISCORD</strong></a></p>
 
 <p><strong>NOCLIP.WEBSITE WRITTEN</strong> by Jasper<br>
 <strong>CODE ALSO WRITTEN BY</strong> by Sierra<br>
 <strong>CODE ALSO WRITTEN BY</strong> by qbyte</p>
-<strong>FILES HOSTED BY</strong> by Lunascape</p>
+<p><strong>FILES HOSTED BY</strong> by Lunascape, Octapulpo</p>
 
-<p><strong>GO TO <a href="https://gaq9.com">GAQ9.COM</strong></a>
+<p><strong>GO TO <a href="https://crowmonitor.com">CROWMONITOR.COM</strong></a>
 
 <p><strong>OPEN SOURCE</strong> at <a href="${GITHUB_URL}">GitHub</a></p>
 
@@ -2811,7 +2811,7 @@ class RecordingBranding {
         this.elem.style.textShadow = '0px 0px 10px rgba(0, 0, 0, 0.8)';
         this.elem.style.visibility = 'hidden';
         this.elem.style.userSelect = 'none';
-        this.elem.textContent = '[ gaq9.com ]';
+        this.elem.textContent = '[ crowmonitor.com ]';
     }
 
     public v(): void {

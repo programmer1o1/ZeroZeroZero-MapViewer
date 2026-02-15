@@ -27,12 +27,12 @@ export class ParameterTexture {
     }
 
     public index(i: number): Parameter {
-        throw "whoops";
+        throw new Error(`ParameterTexture does not support index access (index=${i})`);
     }
 
     public set(param: Parameter): void {
         // Cannot dynamically change at runtime.
-        throw "whoops";
+        throw new Error(`ParameterTexture does not support set()`);
     }
 
     public async fetch(materialCache: MaterialCache, entityParams: EntityMaterialParameters | null): Promise<void> {
@@ -76,12 +76,12 @@ export class ParameterString {
     }
 
     public index(i: number): Parameter {
-        throw "whoops";
+        throw new Error(`ParameterString does not support index access (index=${i})`);
     }
 
     public set(param: Parameter): void {
         // Cannot dynamically change at runtime.
-        throw "whoops";
+        throw new Error(`ParameterString does not support set()`);
     }
 }
 
@@ -96,7 +96,7 @@ export class ParameterNumber {
     }
 
     public index(i: number): Parameter {
-        throw "whoops";
+        throw new Error(`ParameterNumber does not support index access (index=${i})`);
     }
 
     public set(param: Parameter): void {
@@ -173,11 +173,11 @@ export class ParameterMatrix {
     }
 
     public index(i: number): Parameter {
-        throw "whoops";
+        throw new Error(`ParameterMatrix does not support index access (index=${i})`);
     }
 
     public set(param: Parameter): void {
-        throw "whoops";
+        throw new Error(`ParameterMatrix does not support set()`);
     }
 }
 
@@ -216,7 +216,7 @@ export class ParameterVector {
             this.internal[1].value = param.value;
             this.internal[2].value = param.value;
         } else {
-            throw "whoops";
+            throw new Error(`ParameterVector.set() does not support param type: ${param.constructor?.name ?? 'unknown'}`);
         }
     }
 

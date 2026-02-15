@@ -270,6 +270,8 @@ export class SkyboxRenderer {
     private modelMatrix = mat4.create();
     public hasAnyMissingTexture = false; 
 
+    private skynameResolved: string;
+
     constructor(renderContext: SourceRenderContext, private skyname: string) {
         const device = renderContext.device, cache = renderContext.renderCache;
 
@@ -338,6 +340,7 @@ export class SkyboxRenderer {
         ];
         this.indexBufferDescriptor = { buffer: this.indexBuffer, byteOffset: 0, };
 
+        this.skynameResolved = this.resolveSkyname(renderContext);
         // should run and see missing texture this will allow "hall of mirrors" even though it already fallback to missing texture
         this.checkSkyboxTextures(renderContext);
         this.bindMaterial(renderContext);
@@ -352,8 +355,34 @@ export class SkyboxRenderer {
             return materialInstance;
         } catch (e) {
             this.hasAnyMissingTexture = true;
-            throw e;
+            const errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+            const wrapped = new Error(`Skybox material failed for "${path}": ${errorMessage}`);
+            if (e instanceof Error && e.stack)
+                wrapped.stack = `${wrapped.stack}\nCaused by: ${e.stack}`;
+            throw wrapped;
         }
+    }
+
+    private resolveSkyname(renderContext: SourceRenderContext): string {
+        const filesystem = renderContext.filesystem;
+        const suffixes = ['rt', 'lf', 'bk', 'ft', 'up', 'dn'];
+        const candidates = [this.skyname, `${this.skyname}_hdr`];
+
+        for (const candidate of candidates) {
+            let allFound = true;
+            for (const suffix of suffixes) {
+                const path = `skybox/${candidate}${suffix}`;
+                const resolvedPath = filesystem.resolvePath(path, '.vmt');
+                if (!filesystem.hasEntry(resolvedPath) && !filesystem.hasEntry(`materials/${resolvedPath}`)) {
+                    allFound = false;
+                    break;
+                }
+            }
+            if (allFound)
+                return candidate;
+        }
+
+        return this.skyname;
     }
 
     private checkSkyboxTextures(renderContext: SourceRenderContext): void {
@@ -361,25 +390,37 @@ export class SkyboxRenderer {
         const suffixes = ['rt', 'lf', 'bk', 'ft', 'up', 'dn'];
         
         for (const suffix of suffixes) {
-            const path = `skybox/${this.skyname}${suffix}`;
+            const path = `skybox/${this.skynameResolved}${suffix}`;
             const resolvedPath = filesystem.resolvePath(path, '.vmt');
             
             // check both possible locations
             if (!filesystem.hasEntry(resolvedPath) && !filesystem.hasEntry(`materials/${resolvedPath}`)) {
                 this.hasAnyMissingTexture = true;
+                console.error(`[Skybox] Missing texture. skyname="${this.skyname}" resolvedSkyname="${this.skynameResolved}" path="${path}" resolved="${resolvedPath}.vmt".`);
             }
         }
     }
 
     public async bindMaterial(renderContext: SourceRenderContext) {
         this.materialInstances = await Promise.all([
-            this.createMaterialInstance(renderContext, `skybox/${this.skyname}rt`),
-            this.createMaterialInstance(renderContext, `skybox/${this.skyname}lf`),
-            this.createMaterialInstance(renderContext, `skybox/${this.skyname}bk`),
-            this.createMaterialInstance(renderContext, `skybox/${this.skyname}ft`),
-            this.createMaterialInstance(renderContext, `skybox/${this.skyname}up`),
-            this.createMaterialInstance(renderContext, `skybox/${this.skyname}dn`),
+            this.createMaterialInstance(renderContext, `skybox/${this.skynameResolved}rt`),
+            this.createMaterialInstance(renderContext, `skybox/${this.skynameResolved}lf`),
+            this.createMaterialInstance(renderContext, `skybox/${this.skynameResolved}bk`),
+            this.createMaterialInstance(renderContext, `skybox/${this.skynameResolved}ft`),
+            this.createMaterialInstance(renderContext, `skybox/${this.skynameResolved}up`),
+            this.createMaterialInstance(renderContext, `skybox/${this.skynameResolved}dn`),
         ]).catch((e) => {
+            const errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+            console.error(
+                `[Skybox] Failed to create skybox materials for skyname="${this.skyname}" resolvedSkyname="${this.skynameResolved}" error="${errorMessage}".`
+            );
+            if (e instanceof Error && e.stack) {
+                console.error(`[Skybox] Stack:\n${e.stack}`);
+            } else {
+                const stack = new Error(`Skybox material failure (non-Error): ${errorMessage}`).stack;
+                if (stack)
+                    console.error(`[Skybox] Stack:\n${stack}`);
+            }
             return [];
         });
     }
@@ -1223,14 +1264,6 @@ export class SourceRenderContext {
     public renderCache: GfxRenderCache;
     public currentPointCamera: point_camera | null = null;
     public currentShake: env_shake | null = null;
-    public useFixedTextures = false;
-    private fixedTextureVPKs = [
-        `${pakfilesPathBase}/tf2/plotmas_d`,
-        `${pakfilesPathBase}/tf2/stork`,
-		`${pakfilesPathBase}/tf2/data3fix`,
-		`${pakfilesPathBase}/tf2/data6fix`,
-		`${pakfilesPathBase}/tf2/fortressfix`
-    ];
     private parentRenderer: SourceRenderer | null = null;
 
     // Public settings
@@ -1274,41 +1307,6 @@ export class SourceRenderContext {
 
     public setParentRenderer(renderer: SourceRenderer): void {
         this.parentRenderer = renderer;
-    }
-
-    public async toggleFixedTextures(enable: boolean): Promise<void> {
-        this.useFixedTextures = enable;
-        
-        // toggle the VPK mounts
-        for (const vpkPath of this.fixedTextureVPKs) {
-            await this.filesystem.toggleVPKMount(vpkPath, enable);
-        }
-        
-        // clear material cache to force reload
-        this.materialCache.clearDynamicCache();
-        
-        // reload materials for all BSP renderers
-        if (this.parentRenderer) {
-            // reload skybox first if it exists
-            if (this.parentRenderer.skyboxRenderer) {
-                await this.parentRenderer.skyboxRenderer.bindMaterial(this);
-            }
-            
-            for (const bspRenderer of this.parentRenderer.bspRenderers) {
-                await bspRenderer.reloadMaterials(this);
-            }
-        }
-        // disable hall of mirrors effect for data3 maps since it wont load the right skybox
-		// yes this is a hacky way of checking the map shush
-        if (this.parentRenderer) {
-            for (const bspRenderer of this.parentRenderer.bspRenderers) {
-                const skyName = bspRenderer.getWorldSpawn().skyname;
-                if (skyName === 'sky_ep01_04a') {
-                    this.enableSkyBleed = false;
-                }
-            }
-        }
-
     }
 
    public async cleanup(): Promise<void> {
@@ -1820,8 +1818,6 @@ export class SourceRenderer implements SceneGfx {
     private bloomBlurYProgram: GfxProgram;
     private fullscreenPostProgram: GfxProgram;
     private fullscreenPostProgramBloom: GfxProgram;
-    private static fixedTexturesEnabled = false; 
-
     constructor(private sceneContext: SceneContext, public renderContext: SourceRenderContext) {
         // Make the reflection view a bit cheaper.
         this.reflectViewRenderer.drawProjectedShadows = false;
@@ -1830,10 +1826,6 @@ export class SourceRenderer implements SceneGfx {
 
         this.renderHelper = new GfxRenderHelper(renderContext.device, sceneContext, renderContext.renderCache);
         renderContext.setParentRenderer(this);
-
-        if (SourceRenderer.fixedTexturesEnabled) {
-            renderContext.toggleFixedTextures(true).catch(console.error);
-        }
 
         this.luminanceHistogram = new LuminanceHistogram(this.renderContext.renderCache);
 
@@ -1961,32 +1953,6 @@ export class SourceRenderer implements SceneGfx {
             const v = enableExtensiveWater.checked;
             this.renderContext.enableExpensiveWater = v;
         };
-
-        const useFixedTextures = new UI.Checkbox('Use Fixed Textures', SourceRenderer.fixedTexturesEnabled);
-        let isTogglingTextures = false;
-        
-        useFixedTextures.onchanged = async () => {
-            if (isTogglingTextures) return;
-            
-            const v = useFixedTextures.checked;
-            isTogglingTextures = true;
-            useFixedTextures.elem.style.opacity = '0.5';
-            useFixedTextures.elem.style.pointerEvents = 'none';
-            
-            try {
-                await this.renderContext.toggleFixedTextures(v);
-                SourceRenderer.fixedTexturesEnabled = v; // save state
-            } catch (e) {
-                console.error('Failed to toggle fixed textures:', e);
-                // revert checkbox on error
-                useFixedTextures.checked = !v;
-            } finally {
-                isTogglingTextures = false;
-                useFixedTextures.elem.style.opacity = '1';
-                useFixedTextures.elem.style.pointerEvents = 'auto';
-            }
-        };
-        renderHacksPanel.contents.appendChild(useFixedTextures.elem);
 
         const showGameText = new UI.Checkbox('Show game_text Messages', game_text.getGlobalEnabled());
         showGameText.onchanged = () => {

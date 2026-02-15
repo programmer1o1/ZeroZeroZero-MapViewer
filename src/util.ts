@@ -12,7 +12,7 @@ export function assertExists<T>(v: T | null | undefined, name: string = ''): T {
     if (v !== undefined && v !== null)
         return v;
     else
-        throw new Error(`Missing object ${name}`);
+        throw new Error(name ? `Missing object ${name}` : 'Missing object (no name provided)');
 }
 
 export function nullify<T>(v: T | undefined | null): T | null {
